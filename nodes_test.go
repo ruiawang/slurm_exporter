@@ -31,6 +31,10 @@ func TestNodesMetrics(t *testing.T) {
 	t.Logf("%+v", ParseNodesMetrics(data))
 }
 
+func TestNodesGetPartitions(t *testing.T) {
+	t.Logf("%+v", SlurmGetPartitions())
+}
+
 func TestNodesGetMetrics(t *testing.T) {
-	t.Logf("%+v", NodesGetMetrics())
+	t.Logf("%+v", NodesGetMetrics("foo"))
 }
