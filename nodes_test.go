@@ -19,6 +19,8 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNodesMetrics(t *testing.T) {
@@ -28,13 +30,10 @@ func TestNodesMetrics(t *testing.T) {
 		t.Fatalf("Can not open test data: %v", err)
 	}
 	data, err := ioutil.ReadAll(file)
-	t.Logf("%+v", ParseNodesMetrics(data))
-}
-
-func TestNodesGetPartitions(t *testing.T) {
-	t.Logf("%+v", SlurmGetPartitions())
-}
-
-func TestNodesGetMetrics(t *testing.T) {
-	t.Logf("%+v", NodesGetMetrics("foo"))
+	nm := ParseNodesMetrics(data)
+	assert.Equal(t, 10, int(nm.idle["feature_a,feature_b"]))
+	assert.Equal(t, 10, int(nm.down["feature_a,feature_b"]))
+	assert.Equal(t, 40, int(nm.alloc["feature_a,feature_b"]))
+	assert.Equal(t, 20, int(nm.alloc["feature_a"]))
+	assert.Equal(t, 10, int(nm.down["null"]))
 }
