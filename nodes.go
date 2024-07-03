@@ -28,18 +28,19 @@ import (
 )
 
 type NodesMetrics struct {
-	alloc map[string]float64
-	comp  map[string]float64
-	down  map[string]float64
-	drain map[string]float64
-	err   map[string]float64
-	fail  map[string]float64
-	idle  map[string]float64
-	maint map[string]float64
-	mix   map[string]float64
-	resv  map[string]float64
-	other map[string]float64
-	total map[string]float64
+	alloc   map[string]float64
+	comp    map[string]float64
+	down    map[string]float64
+	drain   map[string]float64
+	err     map[string]float64
+	fail    map[string]float64
+	idle    map[string]float64
+	maint   map[string]float64
+	mix     map[string]float64
+	resv    map[string]float64
+	other   map[string]float64
+	planned map[string]float64
+	total   map[string]float64
 }
 
 func NodesGetMetrics(part string) *NodesMetrics {
@@ -76,6 +77,7 @@ func InitFeatureSet(nm *NodesMetrics, feature_set string) {
 	nm.mix[feature_set] = nm.mix[feature_set]
 	nm.resv[feature_set] = nm.resv[feature_set]
 	nm.other[feature_set] = nm.other[feature_set]
+	nm.planned[feature_set] = nm.planned[feature_set]
 	nm.total[feature_set] = nm.total[feature_set]
 }
 
@@ -99,6 +101,7 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 	nm.mix = make(map[string]float64)
 	nm.resv = make(map[string]float64)
 	nm.other = make(map[string]float64)
+	nm.planned = make(map[string]float64)
 	nm.total = make(map[string]float64)
 
 	for _, line := range lines_uniq {
@@ -123,6 +126,7 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 			maint := regexp.MustCompile(`^maint`)
 			mix := regexp.MustCompile(`^mix`)
 			resv := regexp.MustCompile(`^res`)
+			planned := regexp.MustCompile(`^planned`)
 			switch {
 			case alloc.MatchString(state):
 				nm.alloc[feature_set] += count
@@ -144,6 +148,8 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 				nm.mix[feature_set] += count
 			case resv.MatchString(state):
 				nm.resv[feature_set] += count
+			case planned.MatchString(state):
+				nm.planned[feature_set] += count
 			default:
 				nm.other[feature_set] += count
 			}
@@ -220,34 +226,36 @@ func NewNodesCollector() *NodesCollector {
 	labelnames = append(labelnames, "partition")
 	labelnames = append(labelnames, "active_feature_set")
 	return &NodesCollector{
-		alloc: prometheus.NewDesc("slurm_nodes_alloc", "Allocated nodes", labelnames, nil),
-		comp:  prometheus.NewDesc("slurm_nodes_comp", "Completing nodes", labelnames, nil),
-		down:  prometheus.NewDesc("slurm_nodes_down", "Down nodes", labelnames, nil),
-		drain: prometheus.NewDesc("slurm_nodes_drain", "Drain nodes", labelnames, nil),
-		err:   prometheus.NewDesc("slurm_nodes_err", "Error nodes", labelnames, nil),
-		fail:  prometheus.NewDesc("slurm_nodes_fail", "Fail nodes", labelnames, nil),
-		idle:  prometheus.NewDesc("slurm_nodes_idle", "Idle nodes", labelnames, nil),
-		maint: prometheus.NewDesc("slurm_nodes_maint", "Maint nodes", labelnames, nil),
-		mix:   prometheus.NewDesc("slurm_nodes_mix", "Mix nodes", labelnames, nil),
-		resv:  prometheus.NewDesc("slurm_nodes_resv", "Reserved nodes", labelnames, nil),
-		other: prometheus.NewDesc("slurm_nodes_other", "Nodes reported with an unknown state", labelnames, nil),
-		total: prometheus.NewDesc("slurm_nodes_total", "Total number of nodes", nil, nil),
+		alloc:   prometheus.NewDesc("slurm_nodes_alloc", "Allocated nodes", labelnames, nil),
+		comp:    prometheus.NewDesc("slurm_nodes_comp", "Completing nodes", labelnames, nil),
+		down:    prometheus.NewDesc("slurm_nodes_down", "Down nodes", labelnames, nil),
+		drain:   prometheus.NewDesc("slurm_nodes_drain", "Drain nodes", labelnames, nil),
+		err:     prometheus.NewDesc("slurm_nodes_err", "Error nodes", labelnames, nil),
+		fail:    prometheus.NewDesc("slurm_nodes_fail", "Fail nodes", labelnames, nil),
+		idle:    prometheus.NewDesc("slurm_nodes_idle", "Idle nodes", labelnames, nil),
+		maint:   prometheus.NewDesc("slurm_nodes_maint", "Maint nodes", labelnames, nil),
+		mix:     prometheus.NewDesc("slurm_nodes_mix", "Mix nodes", labelnames, nil),
+		resv:    prometheus.NewDesc("slurm_nodes_resv", "Reserved nodes", labelnames, nil),
+		other:   prometheus.NewDesc("slurm_nodes_other", "Nodes reported with an unknown state", labelnames, nil),
+		planned: prometheus.NewDesc("slurm_nodes_planned", "Planned nodes", labelnames, nil),
+		total:   prometheus.NewDesc("slurm_nodes_total", "Total number of nodes", nil, nil),
 	}
 }
 
 type NodesCollector struct {
-	alloc *prometheus.Desc
-	comp  *prometheus.Desc
-	down  *prometheus.Desc
-	drain *prometheus.Desc
-	err   *prometheus.Desc
-	fail  *prometheus.Desc
-	idle  *prometheus.Desc
-	maint *prometheus.Desc
-	mix   *prometheus.Desc
-	resv  *prometheus.Desc
-	other *prometheus.Desc
-	total *prometheus.Desc
+	alloc   *prometheus.Desc
+	comp    *prometheus.Desc
+	down    *prometheus.Desc
+	drain   *prometheus.Desc
+	err     *prometheus.Desc
+	fail    *prometheus.Desc
+	idle    *prometheus.Desc
+	maint   *prometheus.Desc
+	mix     *prometheus.Desc
+	resv    *prometheus.Desc
+	other   *prometheus.Desc
+	planned *prometheus.Desc
+	total   *prometheus.Desc
 }
 
 // Send all metric descriptions
@@ -263,6 +271,7 @@ func (nc *NodesCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- nc.mix
 	ch <- nc.resv
 	ch <- nc.other
+	ch <- nc.planned
 	ch <- nc.total
 }
 
@@ -291,6 +300,7 @@ func (nc *NodesCollector) Collect(ch chan<- prometheus.Metric) {
 		SendFeatureSetMetric(ch, nc.mix, prometheus.GaugeValue, nm.mix, part)
 		SendFeatureSetMetric(ch, nc.resv, prometheus.GaugeValue, nm.resv, part)
 		SendFeatureSetMetric(ch, nc.other, prometheus.GaugeValue, nm.other, part)
+		SendFeatureSetMetric(ch, nc.planned, prometheus.GaugeValue, nm.planned, part)
 	}
 	total := SlurmGetTotal()
 	ch <- prometheus.MustNewConstMetric(nc.total, prometheus.GaugeValue, total)

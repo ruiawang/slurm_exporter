@@ -5,4 +5,6 @@
 10|down*|(null)
 42|foo_bar_baz|(null)
 24|foo_bar_baz|feature_a
+3|planned|feature_a
+5|planned|feature_b
 
