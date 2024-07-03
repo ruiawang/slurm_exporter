@@ -36,4 +36,6 @@ func TestNodesMetrics(t *testing.T) {
 	assert.Equal(t, 40, int(nm.alloc["feature_a,feature_b"]))
 	assert.Equal(t, 20, int(nm.alloc["feature_a"]))
 	assert.Equal(t, 10, int(nm.down["null"]))
+	assert.Equal(t, 42, int(nm.other["null"]))
+	assert.Equal(t, 24, int(nm.other["feature_a"]))
 }

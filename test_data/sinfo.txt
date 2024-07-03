@@ -3,4 +3,6 @@
 40|allocated|feature_a,feature_b
 20|allocated|feature_a
 10|down*|(null)
+42|foo_bar_baz|(null)
+24|foo_bar_baz|feature_a
 
