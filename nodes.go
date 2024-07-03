@@ -16,14 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package main
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 	"io/ioutil"
 	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 )
 
 type NodesMetrics struct {
@@ -62,6 +63,7 @@ func RemoveDuplicates(s []string) []string {
 }
 
 func InitFeatureSet(nm *NodesMetrics, feature_set string) {
+	//lint:file-ignore SA4018 If the feature set exists keep, else assign nil
 	nm.alloc[feature_set] = nm.alloc[feature_set]
 	nm.comp[feature_set] = nm.comp[feature_set]
 	nm.down[feature_set] = nm.down[feature_set]
@@ -98,10 +100,10 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 
 	for _, line := range lines_uniq {
 		if strings.Contains(line, "|") {
-	                split := strings.Split(line, "|")
-	                state := split[1]
-	                count, _ := strconv.ParseFloat(strings.TrimSpace(split[0]), 64)
-	                features := strings.Split(split[2], ",")
+			split := strings.Split(line, "|")
+			state := split[1]
+			count, _ := strconv.ParseFloat(strings.TrimSpace(split[0]), 64)
+			features := strings.Split(split[2], ",")
 			sort.Strings(features)
 			feature_set = strings.Join(features[:], ",")
 			if feature_set == "(null)" {
@@ -119,25 +121,25 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 			mix := regexp.MustCompile(`^mix`)
 			resv := regexp.MustCompile(`^res`)
 			switch {
-			case alloc.MatchString(state) == true:
+			case alloc.MatchString(state):
 				nm.alloc[feature_set] += count
-			case comp.MatchString(state) == true:
+			case comp.MatchString(state):
 				nm.comp[feature_set] += count
-			case down.MatchString(state) == true:
+			case down.MatchString(state):
 				nm.down[feature_set] += count
-			case drain.MatchString(state) == true:
+			case drain.MatchString(state):
 				nm.drain[feature_set] += count
-			case fail.MatchString(state) == true:
+			case fail.MatchString(state):
 				nm.fail[feature_set] += count
-			case err.MatchString(state) == true:
+			case err.MatchString(state):
 				nm.err[feature_set] += count
-			case idle.MatchString(state) == true:
+			case idle.MatchString(state):
 				nm.idle[feature_set] += count
-			case maint.MatchString(state) == true:
+			case maint.MatchString(state):
 				nm.maint[feature_set] += count
-			case mix.MatchString(state) == true:
+			case mix.MatchString(state):
 				nm.mix[feature_set] += count
-			case resv.MatchString(state) == true:
+			case resv.MatchString(state):
 				nm.resv[feature_set] += count
 			}
 		}

@@ -16,13 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package main
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 	"io/ioutil"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 )
 
 /*
@@ -33,24 +34,24 @@ import (
 
 // Basic metrics for the scheduler
 type SchedulerMetrics struct {
-	threads                   	  float64
-	queue_size                	  float64
-	dbd_queue_size            	  float64
-	last_cycle                	  float64
-	mean_cycle                	  float64
-	cycle_per_minute          	  float64
-	backfill_last_cycle       	  float64
-	backfill_mean_cycle       	  float64
-	backfill_depth_mean       	  float64
+	threads                           float64
+	queue_size                        float64
+	dbd_queue_size                    float64
+	last_cycle                        float64
+	mean_cycle                        float64
+	cycle_per_minute                  float64
+	backfill_last_cycle               float64
+	backfill_mean_cycle               float64
+	backfill_depth_mean               float64
 	total_backfilled_jobs_since_start float64
 	total_backfilled_jobs_since_cycle float64
 	total_backfilled_heterogeneous    float64
-	rpc_stats_count           map[string]float64
-	rpc_stats_avg_time        map[string]float64
-	rpc_stats_total_time      map[string]float64
-	user_rpc_stats_count      map[string]float64
-	user_rpc_stats_avg_time   map[string]float64
-	user_rpc_stats_total_time map[string]float64
+	rpc_stats_count                   map[string]float64
+	rpc_stats_avg_time                map[string]float64
+	rpc_stats_total_time              map[string]float64
+	user_rpc_stats_count              map[string]float64
+	user_rpc_stats_avg_time           map[string]float64
+	user_rpc_stats_total_time         map[string]float64
 }
 
 // Execute the sdiag command and return its output
@@ -92,13 +93,13 @@ func ParseSchedulerMetrics(input []byte) *SchedulerMetrics {
 			tbc := regexp.MustCompile(`^[\s]+Total backfilled jobs \(since last stats cycle start\)`)
 			tbh := regexp.MustCompile(`^[\s]+Total backfilled heterogeneous job components`)
 			switch {
-			case st.MatchString(state) == true:
+			case st.MatchString(state):
 				sm.threads, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case qs.MatchString(state) == true:
+			case qs.MatchString(state):
 				sm.queue_size, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case dbd.MatchString(state) == true:
+			case dbd.MatchString(state):
 				sm.dbd_queue_size, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case lc.MatchString(state) == true:
+			case lc.MatchString(state):
 				if lc_count == 0 {
 					sm.last_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
 					lc_count = 1
@@ -106,7 +107,7 @@ func ParseSchedulerMetrics(input []byte) *SchedulerMetrics {
 				if lc_count == 1 {
 					sm.backfill_last_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
 				}
-			case mc.MatchString(state) == true:
+			case mc.MatchString(state):
 				if mc_count == 0 {
 					sm.mean_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
 					mc_count = 1
@@ -114,15 +115,15 @@ func ParseSchedulerMetrics(input []byte) *SchedulerMetrics {
 				if mc_count == 1 {
 					sm.backfill_mean_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
 				}
-			case cpm.MatchString(state) == true:
+			case cpm.MatchString(state):
 				sm.cycle_per_minute, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case dpm.MatchString(state) == true:
+			case dpm.MatchString(state):
 				sm.backfill_depth_mean, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case tbs.MatchString(state) == true:
+			case tbs.MatchString(state):
 				sm.total_backfilled_jobs_since_start, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case tbc.MatchString(state) == true:
+			case tbc.MatchString(state):
 				sm.total_backfilled_jobs_since_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case tbh.MatchString(state) == true:
+			case tbh.MatchString(state):
 				sm.total_backfilled_heterogeneous, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
 			}
 		}
@@ -221,24 +222,24 @@ func SchedulerGetMetrics() *SchedulerMetrics {
 
 // Collector strcture
 type SchedulerCollector struct {
-	threads                   	  *prometheus.Desc
-	queue_size                	  *prometheus.Desc
-	dbd_queue_size            	  *prometheus.Desc
-	last_cycle                	  *prometheus.Desc
-	mean_cycle                	  *prometheus.Desc
-	cycle_per_minute          	  *prometheus.Desc
-	backfill_last_cycle       	  *prometheus.Desc
-	backfill_mean_cycle       	  *prometheus.Desc
-	backfill_depth_mean       	  *prometheus.Desc
+	threads                           *prometheus.Desc
+	queue_size                        *prometheus.Desc
+	dbd_queue_size                    *prometheus.Desc
+	last_cycle                        *prometheus.Desc
+	mean_cycle                        *prometheus.Desc
+	cycle_per_minute                  *prometheus.Desc
+	backfill_last_cycle               *prometheus.Desc
+	backfill_mean_cycle               *prometheus.Desc
+	backfill_depth_mean               *prometheus.Desc
 	total_backfilled_jobs_since_start *prometheus.Desc
 	total_backfilled_jobs_since_cycle *prometheus.Desc
 	total_backfilled_heterogeneous    *prometheus.Desc
-	rpc_stats_count           *prometheus.Desc
-	rpc_stats_avg_time        *prometheus.Desc
-	rpc_stats_total_time      *prometheus.Desc
-	user_rpc_stats_count      *prometheus.Desc
-	user_rpc_stats_avg_time   *prometheus.Desc
-	user_rpc_stats_total_time *prometheus.Desc
+	rpc_stats_count                   *prometheus.Desc
+	rpc_stats_avg_time                *prometheus.Desc
+	rpc_stats_total_time              *prometheus.Desc
+	user_rpc_stats_count              *prometheus.Desc
+	user_rpc_stats_avg_time           *prometheus.Desc
+	user_rpc_stats_total_time         *prometheus.Desc
 }
 
 // Send all metric descriptions
