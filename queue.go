@@ -16,12 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package main
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"io/ioutil"
 	"log"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type NNVal map[string]map[string]map[string]float64
@@ -68,9 +69,9 @@ func (s *NVal) Incr(user string, part string, count float64) {
 }
 
 func (s *NNVal) Incr2(reason string, user string, part string, count float64) {
-	child, ok := (*s)[reason]
+	_, ok := (*s)[reason]
 	if !ok {
-		child = map[string]map[string]float64{}
+		child := map[string]map[string]float64{}
 		(*s)[reason] = child
 	}
 	child2, ok := (*s)[reason][user]

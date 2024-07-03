@@ -1,4 +1,4 @@
-/* Copyright 2017 Victor Penso, Matteo Dessalvi
+/* Copyright 2017-2020 Victor Penso, Matteo Dessalvi, Joeri Hermans
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,31 +16,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package main
 
 import (
-  "flag"
-  "net/http"
-  "github.com/prometheus/common/log"
-  "github.com/prometheus/client_golang/prometheus"
-  "github.com/prometheus/client_golang/prometheus/promhttp"
+	"flag"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/log"
+	"net/http"
 )
 
 func init() {
-  // Metrics have to be registered to be exposed
-  prometheus.MustRegister(NewSchedulerCollector()) // from scheduler.go
-  prometheus.MustRegister(NewQueueCollector())     // from queue.go
-  prometheus.MustRegister(NewNodesCollector())     // from nodes.go
-  prometheus.MustRegister(NewCPUsCollector())      // from cpus.go
+	// Metrics have to be registered to be exposed
+	prometheus.MustRegister(NewAccountsCollector())       // from accounts.go
+	prometheus.MustRegister(NewCPUsCollector())           // from cpus.go
+	prometheus.MustRegister(NewNodesCollector())          // from nodes.go
+	prometheus.MustRegister(NewNodeCollector())           // from node.go
+	prometheus.MustRegister(NewPartitionsCollector())     // from partitions.go
+	prometheus.MustRegister(NewQueueCollector())          // from queue.go
+	prometheus.MustRegister(NewSchedulerCollector())      // from scheduler.go
+	prometheus.MustRegister(NewFairShareCollector())      // from sshare.go
+	prometheus.MustRegister(NewUsersCollector())          // from users.go
 }
 
 var listenAddress = flag.String(
-  "listen-address",
-  ":8080",
-  "The address to listen on for HTTP requests.")
+	"listen-address",
+	":8080",
+	"The address to listen on for HTTP requests.")
+
+var gpuAcct = flag.Bool(
+	"gpus-acct",
+	false,
+	"Enable GPUs accounting")
 
 func main() {
-  flag.Parse()
-  // The Handler function provides a default handler to expose metrics
+	flag.Parse()
+
+	// Turn on GPUs accounting only if the corresponding command line option is set to true.
+	if *gpuAcct {
+		prometheus.MustRegister(NewGPUsCollector())   // from gpus.go
+	}
+
+	// The Handler function provides a default handler to expose metrics
 	// via an HTTP server. "/metrics" is the usual endpoint for that.
-  log.Infof("Starting Server: %s", *listenAddress)
-  http.Handle("/metrics", promhttp.Handler())
-  log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	log.Infof("Starting Server: %s", *listenAddress)
+	log.Infof("GPUs Accounting: %t", *gpuAcct)
+	http.Handle("/metrics", promhttp.Handler())
+	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }

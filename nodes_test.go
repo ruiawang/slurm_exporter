@@ -16,19 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package main
 
 import (
-  "testing"
-  "os"
-  "io/ioutil"
+	"io/ioutil"
+	"os"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNodesMetrics(t *testing.T) {
-  // Read the input data from a file
-  file, err := os.Open("test_data/sinfo.txt")
-  if err != nil { t.Fatalf("Can not open test data: %v", err) }
-  data, err := ioutil.ReadAll(file)
-  t.Logf("%+v", ParseNodesMetrics(data))
-}
-
-func TestNodesGetMetrics(t *testing.T) {
-  t.Logf("%+v", NodesGetMetrics())
+	// Read the input data from a file
+	file, err := os.Open("test_data/sinfo.txt")
+	if err != nil {
+		t.Fatalf("Can not open test data: %v", err)
+	}
+	data, err := ioutil.ReadAll(file)
+	nm := ParseNodesMetrics(data)
+	assert.Equal(t, 10, int(nm.idle["feature_a,feature_b"]))
+	assert.Equal(t, 10, int(nm.down["feature_a,feature_b"]))
+	assert.Equal(t, 40, int(nm.alloc["feature_a,feature_b"]))
+	assert.Equal(t, 20, int(nm.alloc["feature_a"]))
+	assert.Equal(t, 10, int(nm.down["null"]))
+	assert.Equal(t, 42, int(nm.other["null"]))
+	assert.Equal(t, 24, int(nm.other["feature_a"]))
 }

@@ -16,14 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package main
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 	"io/ioutil"
 	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 )
 
 type NodesMetrics struct {
@@ -37,6 +38,7 @@ type NodesMetrics struct {
 	maint map[string]float64
 	mix   map[string]float64
 	resv  map[string]float64
+	other map[string]float64
 	total map[string]float64
 }
 
@@ -51,8 +53,10 @@ func RemoveDuplicates(s []string) []string {
 	// Walk through the slice 's' and for each value we haven't seen so far, append it to 't'.
 	for _, v := range s {
 		if _, seen := m[v]; !seen {
-			t = append(t, v)
-			m[v] = true
+			if len(v) > 0 {
+				t = append(t, v)
+				m[v] = true
+			}
 		}
 	}
 
@@ -60,6 +64,7 @@ func RemoveDuplicates(s []string) []string {
 }
 
 func InitFeatureSet(nm *NodesMetrics, feature_set string) {
+	//lint:file-ignore SA4018 If the feature set exists keep, else assign nil
 	nm.alloc[feature_set] = nm.alloc[feature_set]
 	nm.comp[feature_set] = nm.comp[feature_set]
 	nm.down[feature_set] = nm.down[feature_set]
@@ -70,6 +75,7 @@ func InitFeatureSet(nm *NodesMetrics, feature_set string) {
 	nm.maint[feature_set] = nm.maint[feature_set]
 	nm.mix[feature_set] = nm.mix[feature_set]
 	nm.resv[feature_set] = nm.resv[feature_set]
+	nm.other[feature_set] = nm.other[feature_set]
 	nm.total[feature_set] = nm.total[feature_set]
 }
 
@@ -92,12 +98,15 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 	nm.maint = make(map[string]float64)
 	nm.mix = make(map[string]float64)
 	nm.resv = make(map[string]float64)
+	nm.other = make(map[string]float64)
 	nm.total = make(map[string]float64)
 
 	for _, line := range lines_uniq {
 		if strings.Contains(line, "|") {
-			state := strings.Split(line, "|")
-			features := strings.Split(state[2], ",")
+			split := strings.Split(line, "|")
+			state := split[1]
+			count, _ := strconv.ParseFloat(strings.TrimSpace(split[0]), 64)
+			features := strings.Split(split[2], ",")
 			sort.Strings(features)
 			feature_set = strings.Join(features[:], ",")
 			if feature_set == "(null)" {
@@ -115,35 +124,37 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 			mix := regexp.MustCompile(`^mix`)
 			resv := regexp.MustCompile(`^res`)
 			switch {
-			case alloc.MatchString(state[1]) == true:
-				nm.alloc[feature_set]++
-			case comp.MatchString(state[1]) == true:
-				nm.comp[feature_set]++
-			case down.MatchString(state[1]) == true:
-				nm.down[feature_set]++
-			case drain.MatchString(state[1]) == true:
-				nm.drain[feature_set]++
-			case fail.MatchString(state[1]) == true:
-				nm.fail[feature_set]++
-			case err.MatchString(state[1]) == true:
-				nm.err[feature_set]++
-			case idle.MatchString(state[1]) == true:
-				nm.idle[feature_set]++
-			case maint.MatchString(state[1]) == true:
-				nm.maint[feature_set]++
-			case mix.MatchString(state[1]) == true:
-				nm.mix[feature_set]++
-			case resv.MatchString(state[1]) == true:
-				nm.resv[feature_set]++
+			case alloc.MatchString(state):
+				nm.alloc[feature_set] += count
+			case comp.MatchString(state):
+				nm.comp[feature_set] += count
+			case down.MatchString(state):
+				nm.down[feature_set] += count
+			case drain.MatchString(state):
+				nm.drain[feature_set] += count
+			case fail.MatchString(state):
+				nm.fail[feature_set] += count
+			case err.MatchString(state):
+				nm.err[feature_set] += count
+			case idle.MatchString(state):
+				nm.idle[feature_set] += count
+			case maint.MatchString(state):
+				nm.maint[feature_set] += count
+			case mix.MatchString(state):
+				nm.mix[feature_set] += count
+			case resv.MatchString(state):
+				nm.resv[feature_set] += count
+			default:
+				nm.other[feature_set] += count
 			}
 		}
 	}
 	return &nm
 }
 
-// Execute the squeue command and return its output
+// Execute the sinfo command and return its output
 func NodesData(part string) []byte {
-	cmd := exec.Command("sinfo", "-h", "-o %n|%T|%b", "-p", part, "| sort", "| uniq")
+	cmd := exec.Command("sinfo", "-h", "-o %D|%T|%b", "-p", part, "| sort", "| uniq")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatal(err)
@@ -219,6 +230,7 @@ func NewNodesCollector() *NodesCollector {
 		maint: prometheus.NewDesc("slurm_nodes_maint", "Maint nodes", labelnames, nil),
 		mix:   prometheus.NewDesc("slurm_nodes_mix", "Mix nodes", labelnames, nil),
 		resv:  prometheus.NewDesc("slurm_nodes_resv", "Reserved nodes", labelnames, nil),
+		other: prometheus.NewDesc("slurm_nodes_other", "Nodes reported with an unknown state", labelnames, nil),
 		total: prometheus.NewDesc("slurm_nodes_total", "Total number of nodes", nil, nil),
 	}
 }
@@ -234,6 +246,7 @@ type NodesCollector struct {
 	maint *prometheus.Desc
 	mix   *prometheus.Desc
 	resv  *prometheus.Desc
+	other *prometheus.Desc
 	total *prometheus.Desc
 }
 
@@ -249,6 +262,7 @@ func (nc *NodesCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- nc.maint
 	ch <- nc.mix
 	ch <- nc.resv
+	ch <- nc.other
 	ch <- nc.total
 }
 
@@ -276,6 +290,7 @@ func (nc *NodesCollector) Collect(ch chan<- prometheus.Metric) {
 		SendFeatureSetMetric(ch, nc.maint, prometheus.GaugeValue, nm.maint, part)
 		SendFeatureSetMetric(ch, nc.mix, prometheus.GaugeValue, nm.mix, part)
 		SendFeatureSetMetric(ch, nc.resv, prometheus.GaugeValue, nm.resv, part)
+		SendFeatureSetMetric(ch, nc.other, prometheus.GaugeValue, nm.other, part)
 	}
 	total := SlurmGetTotal()
 	ch <- prometheus.MustNewConstMetric(nc.total, prometheus.GaugeValue, total)
