@@ -30,7 +30,3 @@ func TestSchedulerMetrics(t *testing.T) {
 	data, err := ioutil.ReadAll(file)
 	t.Logf("%+v", ParseSchedulerMetrics(data))
 }
-
-func TestSchedulerGetMetrics(t *testing.T) {
-	t.Logf("%+v", SchedulerGetMetrics())
-}

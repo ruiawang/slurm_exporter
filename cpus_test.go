@@ -30,7 +30,3 @@ func TestCPUsMetrics(t *testing.T) {
 	data, err := ioutil.ReadAll(file)
 	t.Logf("%+v", ParseCPUsMetrics(data))
 }
-
-func TestCPUssGetMetrics(t *testing.T) {
-	t.Logf("%+v", CPUsGetMetrics())
-}
