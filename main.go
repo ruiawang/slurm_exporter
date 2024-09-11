@@ -16,48 +16,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package main
 
 import (
-	"flag"
+	"net/http"
+	"os"
+
+	"github.com/alecthomas/kingpin/v2"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
-	"net/http"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/version"
+	"github.com/prometheus/exporter-toolkit/web"
+	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
 )
 
-func init() {
-	// Metrics have to be registered to be exposed
-	prometheus.MustRegister(NewAccountsCollector())       // from accounts.go
-	prometheus.MustRegister(NewCPUsCollector())           // from cpus.go
-	prometheus.MustRegister(NewNodesCollector())          // from nodes.go
-	prometheus.MustRegister(NewNodeCollector())           // from node.go
-	prometheus.MustRegister(NewPartitionsCollector())     // from partitions.go
-	prometheus.MustRegister(NewQueueCollector())          // from queue.go
-	prometheus.MustRegister(NewSchedulerCollector())      // from scheduler.go
-	prometheus.MustRegister(NewFairShareCollector())      // from sshare.go
-	prometheus.MustRegister(NewUsersCollector())          // from users.go
-}
+var (
+	gpuAcct      = kingpin.Flag("gpus-acct", "Enable GPUs accounting").Default("false").Bool()
+	toolkitFlags = webflag.AddFlags(kingpin.CommandLine, ":8080")
+)
 
-var listenAddress = flag.String(
-	"listen-address",
-	":8080",
-	"The address to listen on for HTTP requests.")
-
-var gpuAcct = flag.Bool(
-	"gpus-acct",
-	false,
-	"Enable GPUs accounting")
-
-func main() {
-	flag.Parse()
-
-	// Turn on GPUs accounting only if the corresponding command line option is set to true.
-	if *gpuAcct {
-		prometheus.MustRegister(NewGPUsCollector())   // from gpus.go
+func registerCollectors(gpuAcct bool) {
+	collectors := []prometheus.Collector{
+		NewAccountsCollector(),
+		NewCPUsCollector(),
+		NewNodesCollector(),
+		NewNodeCollector(),
+		NewPartitionsCollector(),
+		NewQueueCollector(),
+		NewSchedulerCollector(),
+		NewFairShareCollector(),
+		NewUsersCollector(),
 	}
 
-	// The Handler function provides a default handler to expose metrics
-	// via an HTTP server. "/metrics" is the usual endpoint for that.
-	log.Infof("Starting Server: %s", *listenAddress)
-	log.Infof("GPUs Accounting: %t", *gpuAcct)
+	// Register GPU collector if enabled
+	if gpuAcct {
+		collectors = append(collectors, NewGPUsCollector())
+	}
+
+	// Register all collectors
+	for _, collector := range collectors {
+		prometheus.MustRegister(collector)
+	}
+}
+
+func main() {
+	// Prometheus logging configuration
+	promlogConfig := &promlog.Config{}
+	kingpin.Version(version.Print("slurm_exporter"))
+	kingpin.HelpFlag.Short('h')
+	kingpin.Parse()
+
+	logger := promlog.New(promlogConfig)
+
+	// Register version metrics
+	prometheus.MustRegister(version.NewCollector("slurm_exporter"))
+
+	// Register collectors based on the GPU accounting flag
+	registerCollectors(*gpuAcct)
+
+	// Log server startup details
+	level.Info(logger).Log("msg", "Starting Server with GPUs Accounting", "enabled", *gpuAcct)
+
+	// Expose /metrics endpoint
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+
+	// Create the HTTP server
+	server := &http.Server{}
+
+	// Use exporter toolkit to start the server (supports TLS, Basic Auth, etc.)
+	if err := web.ListenAndServe(server, toolkitFlags, logger); err != nil {
+		level.Error(logger).Log("msg", "Error starting HTTP server", "err", err)
+		os.Exit(1)
+	}
 }
