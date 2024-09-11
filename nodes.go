@@ -17,6 +17,7 @@ package main
 
 import (
 	"io/ioutil"
+	"log"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -24,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 )
 
 type NodesMetrics struct {
