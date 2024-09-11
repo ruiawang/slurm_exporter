@@ -1,5 +1,5 @@
 bin/
 go/
 *.snap
-
+*.tar.gz
 dist/
