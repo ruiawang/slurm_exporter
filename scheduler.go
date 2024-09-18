@@ -20,10 +20,10 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+    "log"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 )
 
 /*
