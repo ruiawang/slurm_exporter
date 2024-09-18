@@ -1,3 +1,4 @@
+
 # Prometheus Slurm Exporter
 
 Prometheus collector and exporter for metrics extracted from the [Slurm](https://slurm.schedmd.com/overview.html) resource scheduling system.
@@ -19,165 +20,159 @@ Prometheus collector and exporter for metrics extracted from the [Slurm](https:/
 * **Allocated**: GPUs which have been allocated to a job.
 * **Other**: GPUs which are unavailable for use at the moment.
 * **Total**: total number of GPUs.
-* **Utilization**: total GPU utiliazation on the cluster.
+* **Utilization**: total GPU utilization on the cluster.
 
-- Information extracted from the SLURM [**sinfo**](https://slurm.schedmd.com/sinfo.html) and [**sacct**](https://slurm.schedmd.com/sacct.html) command.
+- Information extracted from the SLURM [**sinfo**](https://slurm.schedmd.com/sinfo.html) and [**sacct**](https://slurm.schedmd.com/sacct.html) commands.
 - [Slurm GRES scheduling](https://slurm.schedmd.com/gres.html)
 
-**NOTE**: since version **0.19**, GPU accounting has to be **explicitly** enabled adding the _-gpus-acct_ option to the command line otherwise it will not be activated.
+**IMPORTANT**: GPU accounting is **disabled by default**. To enable GPU accounting, you must pass the `--gpus-acct` flag when running the exporter. Without this flag, GPU-related metrics will not be collected or exported.
 
-Be aware that:
+**NOTE**: Since version **0.19**, you must explicitly enable GPU accounting by adding the `--gpus-acct` option.
 
-* According to issue #38, users reported that newer version of Slurm provides slightly different output and thus GPUs accounting may not work properly.
-* Users who do not have GPUs and/or do not have accounting activated may want to keep GPUs accounting **off** (see issue #45).
 
 ### State of the Nodes
 
-* **Allocated**: nodes which has been allocated to one or more jobs.
+* **Allocated**: nodes which have been allocated to one or more jobs.
 * **Completing**: all jobs associated with these nodes are in the process of being completed.
 * **Down**: nodes which are unavailable for use.
-* **Drain**: with this metric two different states are accounted for:
-  - nodes in ``drained`` state (marked unavailable for use per system administrator request)
-  - nodes in ``draining`` state (currently executing jobs but which will not be allocated for new ones).
-* **Fail**: these nodes are expected to fail soon and are unavailable for use per system administrator request.
-* **Error**: nodes which are currently in an error state and not capable of running any jobs.
-* **Idle**: nodes not allocated to any jobs and thus available for use.
-* **Maint**: nodes which are currently marked with the __maintenance__ flag.
-* **Mixed**: nodes which have some of their CPUs ALLOCATED while others are IDLE.
-* **Resv**: these nodes are in an advanced reservation and not generally available.
+* **Drain**: nodes in a ``drained`` or ``draining`` state.
+* **Fail**: nodes expected to fail soon and unavailable for use.
+* **Error**: nodes in an error state and incapable of running jobs.
+* **Idle**: nodes not allocated to any jobs.
+* **Maint**: nodes marked for maintenance.
+* **Mixed**: nodes with some CPUs allocated and others idle.
+* **Planned**: nodes held for a multi-node job launch.
+* **Resv**: nodes in an advanced reservation.
 
 - Information extracted from the SLURM [**sinfo**](https://slurm.schedmd.com/sinfo.html) command.
 
-#### Additional info about node usage
+#### Additional node usage info
 
-Since version **0.18**, the following information are also extracted and exported for **every** node known by Slurm:
-
-* CPUs: how many are _allocated_, _idle_, _other_ and in _total_.
-* Memory: _allocated_ and in _total_.
-* Labels: hostname and its Slurm status (e.g. _idle_, _mix_, _allocated_, _draining_, etc.).
-
-See the related [test data](https://github.com/vpenso/prometheus-slurm-exporter/blob/master/test_data/sinfo_mem.txt) to check the format of the information extracted from Slurm.
+Since version **0.18**, information about CPUs and memory (allocated, idle, and total) is also extracted for every node known by Slurm. This includes node labels like hostname and status.
 
 ### Status of the Jobs
 
-* **PENDING**: Jobs awaiting for resource allocation.
-* **PENDING_DEPENDENCY**: Jobs awaiting because of an unexecuted job dependency.
-* **RUNNING**: Jobs currently allocated.
-* **SUSPENDED**: Job has an allocation but execution has been suspended and CPUs have been released for other jobs.
-* **CANCELLED**: Jobs which were explicitly cancelled by the user or system administrator.
-* **COMPLETING**: Jobs which are in the process of being completed.
-* **COMPLETED**: Jobs have terminated all processes on all nodes with an exit code of zero.
-* **CONFIGURING**: Jobs have been allocated resources, but are waiting for them to become ready for use.
-* **FAILED**: Jobs terminated with a non-zero exit code or other failure condition.
+* **PENDING**: Jobs awaiting resource allocation.
+* **PENDING_DEPENDENCY**: Jobs awaiting job dependency resolution.
+* **RUNNING**: Jobs currently allocated resources.
+* **SUSPENDED**: Jobs with suspended execution.
+* **CANCELLED**: Jobs cancelled by a user or administrator.
+* **COMPLETING**: Jobs in the process of completion.
+* **COMPLETED**: Jobs that terminated with an exit code of zero.
+* **CONFIGURING**: Jobs waiting for resources to become ready.
+* **FAILED**: Jobs that terminated with a non-zero exit code.
 * **TIMEOUT**: Jobs terminated upon reaching their time limit.
 * **PREEMPTED**: Jobs terminated due to preemption.
-* **NODE_FAIL**: Jobs terminated due to failure of one or more allocated nodes.
+* **NODE_FAIL**: Jobs terminated due to node failure.
 
 - Information extracted from the SLURM [**squeue**](https://slurm.schedmd.com/squeue.html) command.
 
 ### State of the Partitions
 
-* Running/suspended Jobs per partitions, divided between Slurm accounts and users.
-* CPUs total/allocated/idle per partition plus used CPU per user ID.
+* Running/suspended jobs per partition, divided by Slurm account and user.
+* Total/allocated/idle CPUs per partition and per user ID.
 
-### Jobs information per Account and User
+### Jobs Information per Account and User
 
-The following information about jobs are also extracted via [squeue](https://slurm.schedmd.com/squeue.html):
-
-* **Running/Pending/Suspended** jobs per SLURM Account.
-* **Running/Pending/Suspended** jobs per SLURM User.
+Information about running, pending, and suspended jobs per Slurm account and user are also extracted using [**squeue**](https://slurm.schedmd.com/squeue.html).
 
 ### Scheduler Information
 
-* **Server Thread count**: The number of current active ``slurmctld`` threads.
-* **Queue size**: The length of the scheduler queue.
-* **DBD Agent queue size**: The length of the message queue for _SlurmDBD_.
-* **Last cycle**: Time in microseconds for last scheduling cycle.
-* **Mean cycle**: Mean of scheduling cycles since last reset.
-* **Cycles per minute**: Counter of scheduling executions per minute.
-* **(Backfill) Last cycle**: Time in microseconds of last backfilling cycle.
-* **(Backfill) Mean cycle**: Mean of backfilling scheduling cycles in microseconds since last reset.
-* **(Backfill) Depth mean**: Mean of processed jobs during backfilling scheduling cycles since last reset.
-* **(Backfill) Total Backfilled Jobs** (since last slurm start): number of jobs started thanks to backfilling since last Slurm start.
-* **(Backfill) Total Backfilled Jobs** (since last stats cycle start): number of jobs started thanks to backfilling since last time stats where reset.
-* **(Backfill) Total backfilled heterogeneous Job components**: number of heterogeneous job components started thanks to backfilling since last Slurm start.
+* **Server Thread count**: Number of active `slurmctld` threads.
+* **Queue size**: Length of the scheduler queue.
+* **DBD Agent queue size**: Length of the SlurmDBD message queue.
+* **Last cycle**: Time for the last scheduling cycle (microseconds).
+* **Mean cycle**: Mean scheduling cycle time since last reset.
+* **Cycles per minute**: Number of scheduling executions per minute.
+* **Backfill metrics**: Metrics related to backfilling jobs, including cycle times, depth mean, and total backfilled jobs.
 
 - Information extracted from the SLURM [**sdiag**](https://slurm.schedmd.com/sdiag.html) command.
 
-*DBD Agent queue size*: it is particularly important to keep track of it, since an increasing number of messages
-counted with this parameter almost always indicates three issues:
-* the _SlurmDBD_ daemon is down;
-* the database is either down or unreachable;
-* the status of the Slurm accounting DB may be inconsistent (e.g. ``sreport`` missing data, weird utilization of the cluster, etc.).
+### TLS and Basic Authentication
 
-### Share Information
+The Prometheus Slurm Exporter supports TLS and Basic Authentication by using a configuration file. To enable these features, you need to specify the path to a configuration file via the `--web.config.file` flag. For more information on how to configure TLS or Basic Auth, refer to the [Exporter Toolkit documentation](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
 
-Collect _share_ statistics for every Slurm account. Refer to the [manpage of the sshare command](https://slurm.schedmd.com/sshare.html) to get more information.
+Example:
+
+```bash
+./slurm_exporter --web.config.file=/path/to/web-config.yml
+```
+
+An example `web-config.yml` file:
+
+```yaml
+tls_server_config:
+  cert_file: /path/to/cert.crt
+  key_file: /path/to/cert.key
+basic_auth_users:
+  admin: $2y$12$EXAMPLE_ENCRYPTED_PASSWORD_HASH
+```
+
+For more details, see the [Exporter Toolkit documentation](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
 
 ## Installation
 
-* Read [DEVELOPMENT.md](DEVELOPMENT.md) in order to build the Prometheus Slurm Exporter. After a successful build copy the executable
-`bin/prometheus-slurm-exporter` to a node with access to the Slurm command-line interface.
+1. Build the exporter as described in [DEVELOPMENT.md](DEVELOPMENT.md) and copy the executable `bin/slurm_exporter` to a node with access to the Slurm CLI.
+2. A Systemd unit file is provided in [lib/systemd/prometheus-slurm-exporter.service](lib/systemd/prometheus-slurm-exporter.service).
+3. Optionally, you can package the exporter as a Snap. See [packages/snap/README.md](packages/snap/README.md) for details.
 
-* A [Systemd Unit][sdu] file to run the executable as service is available in [lib/systemd/prometheus-slurm-exporter.service](lib/systemd/prometheus-slurm-exporter.service).
+## Commands to Start the Exporter
 
-* (**optional**) Distribute the exporter as a Snap package: consult the [following document](packages/snap/README.md). **NOTE**: this method requires the use of [Snap](https://snapcraft.io), which is built by [Canonical](https://canonical.com).
+Here are the different ways to start the exporter based on your needs:
 
-[sdu]: https://www.freedesktop.org/software/systemd/man/systemd.service.html
+1. **Basic launch without GPU accounting:**
 
-## Prometheus Configuration for the SLURM exporter
-
-It is strongly advisable to configure the Prometheus server with the following parameters:
-
+```bash
+./slurm_exporter --web.listen-address=:8080
 ```
+
+2. Launch with GPU accounting enabled:
+
+```bash
+./slurm_exporter --web.listen-address=:8080 --gpus-acct
+```
+
+Launch with TLS and Basic Authentication:
+
+```bash
+./slurm_exporter --web.listen-address=:8080 --web.config.file=/path/to/web-config.yml
+```
+
+For more details on TLS and Basic Authentication configuration, refer to the [Exporter Toolkit documentation](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
+
+## Prometheus Configuration
+
+Configure Prometheus to scrape the Slurm exporter:
+
+```yaml
 scrape_configs:
-
-#
-# SLURM resource manager:
-#
   - job_name: 'my_slurm_exporter'
-
-    scrape_interval:  30s
-
-    scrape_timeout:   30s
-
+    scrape_interval: 30s
+    scrape_timeout: 30s
     static_configs:
       - targets: ['slurm_host.fqdn:8080']
 ```
 
-* **scrape_interval**: a 30 seconds interval will avoid possible 'overloading' on the SLURM master due to frequent calls of sdiag/squeue/sinfo commands through the exporter.
-* **scrape_timeout**: on a busy SLURM master a too short scraping timeout will abort the communication from the Prometheus server toward the exporter, thus generating a ``context_deadline_exceeded`` error.
+* **scrape_interval**: Set to 30 seconds to prevent overloading the Slurm master.
+* **scrape_timeout**: Ensure a reasonable timeout to avoid `context_deadline_exceeded` errors on a busy Slurm master.
 
-The previous configuration file can be immediately used with a fresh installation of Prometheus. At the same time, we highly recommend to include at least the ``global`` section into the configuration. Official documentation about __configuring Prometheus__ is [available here](https://prometheus.io/docs/prometheus/latest/configuration/configuration/).
+Check the Prometheus configuration before reloading:
 
-**NOTE**: the Prometheus server is using __YAML__ as format for its configuration file, thus **indentation** is really important. Before reloading the Prometheus server it would be better to check the syntax:
-
-```
-$~ promtool check-config prometheus.yml
-
-Checking prometheus.yml
-  SUCCESS: 1 rule files found
-[...]
+```bash
+$ promtool check-config prometheus.yml
 ```
 
 ## Grafana Dashboard
 
-A [dashboard](https://grafana.com/dashboards/4323) is available in order to
-visualize the exported metrics through [Grafana](https://grafana.com):
+A [Grafana dashboard](https://grafana.com/dashboards/4323) is available to visualize the exported metrics:
 
-![Status of the Nodes](images/Node_Status.png)
+![Node Status](images/Node_Status.png)
 
-![Status of the Jobs](images/Job_Status.png)
+![Job Status](images/Job_Status.png)
 
-![SLURM Scheduler Information](images/Scheduler_Info.png)
-
+![Scheduler Info](images/Scheduler_Info.png)
 
 ## License
 
-Copyright 2017-2020 Victor Penso, Matteo Dessalvi
+This project is licensed under the GNU General Public License, version 3 or later.
 
-This is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/.
