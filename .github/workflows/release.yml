@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.*'  # Trigger the workflow for tags like 0.20, 1.0, etc.
+
+jobs:
+  release:
+    name: Multi-Arch Build and Release
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        goos: [linux]
+        goarch: [386, amd64, arm64]  # Build for x86, x64, and arm64 architectures
+        go_version: [1.22]
+
+    steps:
+      # Step 1: Check out the source code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up the Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go_version }}
+
+      # Step 3: Install Go dependencies
+      - name: Install Go dependencies
+        run: |
+          go mod tidy
+          go mod download
+
+      # Step 4: Build the binary for each architecture
+      - name: Build binary for ${{ matrix.goos }}-${{ matrix.goarch }}
+        run: |
+          mkdir -p bin
+          PROJECT_NAME=slurm_exporter
+          VERSION=${{ github.ref_name }}
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o bin/${PROJECT_NAME}
+
+      # Step 5: Create release archives in the desired format
+      - name: Create release archive for ${{ matrix.goos }}-${{ matrix.goarch }}
+        run: |
+          mkdir -p release
+          PROJECT_NAME=slurm_exporter
+          VERSION=${{ github.ref_name }}
+          ARCHIVE_NAME=${PROJECT_NAME}-${VERSION}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          tar -czf release/${ARCHIVE_NAME} -C bin ${PROJECT_NAME}
+
+      # Step 6: Create a new GitHub release using a custom secret
+      - name: Create GitHub Release
+        id: create_release
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the custom secret token
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: "Release version ${{ github.ref_name }} with multi-architecture support."
+          draft: false
+          prerelease: false
+
+      # Step 7: Upload the release assets for each architecture
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the custom secret for upload
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release/slurm_exporter-${{ github.ref_name }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          asset_name: slurm_exporter-${{ github.ref_name }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          asset_content_type: application/gzip
