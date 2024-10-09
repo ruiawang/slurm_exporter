@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"os/exec"
 	"regexp"
@@ -168,7 +168,7 @@ func NodesData(part string) []byte {
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	out, _ := ioutil.ReadAll(stdout)
+	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
 		log.Fatal(err)
 	}
@@ -188,8 +188,8 @@ func SlurmGetTotal() float64 {
 	if err := cmd.Start(); err != nil {
 		log.Fatalf("cmd.Start: %v", err)
 	}
-	out, _ := ioutil.ReadAll(stdout)
-	err_out, _ := ioutil.ReadAll(stderr)
+	out, _ := io.ReadAll(stdout)
+	err_out, _ := io.ReadAll(stderr)
 	if err := cmd.Wait(); err != nil {
 		log.Fatalf("cmd.Wait: %v %s %s", err, out, err_out)
 	}
@@ -207,7 +207,7 @@ func SlurmGetPartitions() []string {
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	out, _ := ioutil.ReadAll(stdout)
+	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
 		log.Fatal(err)
 	}
