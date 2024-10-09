@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - '[0-9]+.*'  # Trigger the workflow for tags like 0.20, 1.0, etc.
+  workflow_dispatch:  # Allows manual triggering of the workflow
 
 jobs:
   release:
@@ -38,7 +39,7 @@ jobs:
         run: |
           mkdir -p bin
           PROJECT_NAME=slurm_exporter
-          VERSION=${{ github.ref_name }}
+          VERSION=${{ github.ref_name || github.event.inputs.version }}  # Use the version provided by tag or manual input
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o bin/${PROJECT_NAME}
 
       # Step 5: Create release archives in the desired format
@@ -46,7 +47,7 @@ jobs:
         run: |
           mkdir -p release
           PROJECT_NAME=slurm_exporter
-          VERSION=${{ github.ref_name }}
+          VERSION=${{ github.ref_name || github.event.inputs.version }}  # Handle manual version input
           ARCHIVE_NAME=${PROJECT_NAME}-${VERSION}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
           tar -czf release/${ARCHIVE_NAME} -C bin ${PROJECT_NAME}
 
@@ -58,9 +59,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the custom secret token
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: "Release version ${{ github.ref_name }} with multi-architecture support."
+          tag_name: ${{ github.ref_name || github.event.inputs.version }}
+          release_name: Release ${{ github.ref_name || github.event.inputs.version }}
+          body: "Release version ${{ github.ref_name || github.event.inputs.version }} with multi-architecture support."
           draft: false
           prerelease: false
 
@@ -71,6 +72,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the custom secret for upload
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release/slurm_exporter-${{ github.ref_name }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-          asset_name: slurm_exporter-${{ github.ref_name }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          asset_path: release/slurm_exporter-${{ github.ref_name || github.event.inputs.version }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          asset_name: slurm_exporter-${{ github.ref_name || github.event.inputs.version }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
           asset_content_type: application/gzip
