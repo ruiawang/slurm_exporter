@@ -1,5 +1,6 @@
 bin/
+dist/
 go/
 *.snap
-*.tar.gz
-dist/
+*.tar.gz*
+*.swp
