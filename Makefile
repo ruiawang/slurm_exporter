@@ -2,7 +2,7 @@
 PROJECT_NAME = slurm_exporter
 
 # Go environment configuration
-GO_VERSION ?= 1.20
+GO_VERSION ?= 1.22.2
 OS ?= linux
 ARCH ?= amd64
 GOPATH := $(shell pwd)/go/modules

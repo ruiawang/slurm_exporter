@@ -22,6 +22,7 @@ import (
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/version"
@@ -34,6 +35,15 @@ var (
 	toolkitFlags = webflag.AddFlags(kingpin.CommandLine, ":8080")
 )
 
+// Message to display on the root page
+const indexHTML = `<html>
+	<head><title>Slurm Exporter</title></head>
+	<body>
+		<h1>Slurm Exporter</h1>
+		<p>Welcome to the Slurm Exporter. Click <a href='/metrics'>here</a> to see the metrics.</p>
+	</body>
+</html>`
+
 func registerCollectors(gpuAcct bool) {
 	collectors := []prometheus.Collector{
 		NewAccountsCollector(),
@@ -45,6 +55,7 @@ func registerCollectors(gpuAcct bool) {
 		NewSchedulerCollector(),
 		NewFairShareCollector(),
 		NewUsersCollector(),
+		NewSlurmInfoCollector(),
 	}
 
 	// Register GPU collector if enabled
@@ -68,13 +79,19 @@ func main() {
 	logger := promlog.New(promlogConfig)
 
 	// Register version metrics
-	prometheus.MustRegister(version.NewCollector("slurm_exporter"))
+	prometheus.MustRegister(collectors.NewBuildInfoCollector())
 
 	// Register collectors based on the GPU accounting flag
 	registerCollectors(*gpuAcct)
 
 	// Log server startup details
 	level.Info(logger).Log("msg", "Starting Server with GPUs Accounting", "enabled", *gpuAcct)
+
+	// Define the root handler for '/'
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(indexHTML))
+	})
 
 	// Expose /metrics endpoint
 	http.Handle("/metrics", promhttp.Handler())
