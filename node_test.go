@@ -1,22 +1,7 @@
-/* Copyright 2021 Chris Read
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
 package main
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,33 +10,52 @@ import (
 /*
 For this example data line:
 
-a048,79384,193000,3/13/0/16,mix
+a048,79384,193000,3/13/0/16,mix,long
 
 We want output that looks like:
 
-slurm_node_cpus_allocated{name="a048",status="mix"} 3
-slurm_node_cpus_idle{name="a048",status="mix"} 3
-slurm_node_cpus_other{name="a048",status="mix"} 0
-slurm_node_cpus_total{name="a048",status="mix"} 16
-slurm_node_mem_allocated{name="a048",status="mix"} 179384
-slurm_node_mem_total{name="a048",status="mix"} 193000
+slurm_node_cpus_allocated{name="a048",status="mix", partition="long"} 3
+slurm_node_cpus_idle{name="a048",status="mix", partition="long"} 3
+slurm_node_cpus_other{name="a048",status="mix", partition="long"} 0
+slurm_node_cpus_total{name="a048",status="mix", partition="long"} 16
+slurm_node_mem_allocated{name="a048",status="mix", partition="long"} 179384
+slurm_node_mem_total{name="a048",status="mix", partition="long"} 193000
+slurm_node_status{name="a048",status="mix", partition="long"} 1
+
+slurm_node_status{name="a048",status="mix", partition="short"} 1
+slurm_node_status{name="a048",status="idle", partition="all"} 1
 
 */
 
 func TestNodeMetrics(t *testing.T) {
-	// Read the input data from a file
-	data, err := ioutil.ReadFile("test_data/sinfo_mem.txt")
+	// Read the input data from a file using os.ReadFile
+	data, err := os.ReadFile("test_data/sinfo_mem.txt")
 	if err != nil {
 		t.Fatalf("Can not open test data: %v", err)
 	}
 	metrics := ParseNodeMetrics(data)
 	t.Logf("%+v", metrics)
 
-	assert.Contains(t, metrics, "b001")
-	assert.Equal(t, uint64(327680), metrics["b001"].memAlloc)
-	assert.Equal(t, uint64(386000), metrics["b001"].memTotal)
-	assert.Equal(t, uint64(32), metrics["b001"].cpuAlloc)
-	assert.Equal(t, uint64(0), metrics["b001"].cpuIdle)
-	assert.Equal(t, uint64(0), metrics["b001"].cpuOther)
-	assert.Equal(t, uint64(32), metrics["b001"].cpuTotal)
+	assert.Contains(t, metrics, "a048")
+	assert.Equal(t, uint64(163840), metrics["a048"].memAlloc)
+	assert.Equal(t, uint64(193000), metrics["a048"].memTotal)
+	assert.Equal(t, uint64(16), metrics["a048"].cpuAlloc)
+	assert.Equal(t, uint64(0), metrics["a048"].cpuIdle)
+	assert.Equal(t, uint64(0), metrics["a048"].cpuOther)
+	assert.Equal(t, uint64(16), metrics["a048"].cpuTotal)
+	assert.Equal(t, "mixed", metrics["a048"].nodeStatus)
+
+	// Check partitions
+	assert.Contains(t, metrics["a048"].partitions, "long")
+	assert.Contains(t, metrics["a048"].partitions, "short")
+	assert.Contains(t, metrics["a048"].partitions, "all")
+	assert.Contains(t, metrics["a048"].partitions, "gpu")
+
+	// Additional checks for other nodes
+	assert.Contains(t, metrics, "b003")
+	assert.Equal(t, uint64(296960), metrics["b003"].memAlloc)
+	assert.Equal(t, uint64(386000), metrics["b003"].memTotal)
+	assert.Contains(t, metrics["b003"].partitions, "long")
+	assert.Contains(t, metrics["b003"].partitions, "gpu")
+	assert.Equal(t, "down", metrics["b003"].nodeStatus)
 }
