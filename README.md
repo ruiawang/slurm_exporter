@@ -1,8 +1,4 @@
-<script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script>
-<script type='text/javascript'>
-  kofiwidget2.init('Buy me a coffee ❤️☕', '#29abe0', 'C0C514I8WG');
-  kofiwidget2.draw();
-</script>
+[![Buy Me a Coffee](https://storage.ko-fi.com/cdn/kofi2.png?v=3)](https://ko-fi.com/C0C514I8WG)
 
 # Prometheus Slurm Exporter
 
