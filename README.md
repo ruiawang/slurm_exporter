@@ -1,3 +1,4 @@
+[![Buy Me a Coffee](https://storage.ko-fi.com/cdn/kofi2.png?v=3)](https://ko-fi.com/C0C514I8WG)
 
 # Prometheus Slurm Exporter
 
