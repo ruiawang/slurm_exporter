@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.*'  # Trigger on version tags like 0.20, 1.0, etc.
+    branches:
+      - master       # Trigger on the master branch
+      - dev          # Trigger on the dev branch
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  goreleaser:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the source code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Go
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22  # Match your project's Go version
+
+      # Step 3: Install GoReleaser
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v4
+
+      # Step 4: Run GoReleaser based on the branch or tag
+      - name: Run GoReleaser
+        run: |
+          if [[ "${GITHUB_REF}" == refs/heads/master || "${GITHUB_REF}" == refs/heads/dev ]]; then
+            goreleaser --snapshot --rm-dist  # Use --snapshot for branches
+          else
+            goreleaser release --rm-dist  # Create a full release for tags
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the GitHub Actions token

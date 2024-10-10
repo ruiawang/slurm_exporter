@@ -1,0 +1,52 @@
+# .github/workflows/go-ossf-slsa3-publish.yml
+
+name: SLSA Go releaser v2
+
+on:
+  push:
+    tags:
+      - '[0-9]+.*'  # Trigger on version tags like 0.20, 1.0, etc.
+    branches:
+      - master
+      - dev          # Also build on master and dev branches
+  workflow_dispatch:  # Allow manual triggering
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+
+jobs:
+  build:
+    permissions:
+      id-token: write  # Required for signing and SLSA provenance.
+      contents: write  # Needed for uploading release assets.
+    name: SLSA GoReleaser Build
+    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v1.10.0
+    with:
+      go-version: 1.22.2
+      config: .slsa-goreleaser.yml  # Use the custom SLSA config file
+
+  goreleaser:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Run GoReleaser
+    steps:
+      # Step 1: Check out the source code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up GoReleaser
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v4
+
+      # Step 3: Run GoReleaser based on branch or tag
+      - name: Run GoReleaser
+        run: |
+          if [[ "${GITHUB_REF}" == refs/heads/master || "${GITHUB_REF}" == refs/heads/dev ]]; then
+            goreleaser --snapshot --rm-dist  # Use snapshot for branches
+          else
+            goreleaser release --rm-dist  # Full release for tags
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}
