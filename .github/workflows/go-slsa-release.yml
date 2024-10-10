@@ -1,6 +1,4 @@
-# .github/workflows/go-ossf-slsa3-publish.yml
-
-name: SLSA Go releaser v2
+name: SLSA Go releaser
 
 on:
   push:
@@ -22,31 +20,37 @@ jobs:
       id-token: write  # Required for signing and SLSA provenance.
       contents: write  # Needed for uploading release assets.
     name: SLSA GoReleaser Build
-    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v1.10.0
-    with:
-      go-version: 1.22.2
-      config: .slsa-goreleaser.yml  # Use the custom SLSA config file
-
-  goreleaser:
-    needs: build
     runs-on: ubuntu-latest
-    name: Run GoReleaser
+    strategy:
+      matrix:
+        goarch: [amd64, 386, arm64]  # Multi-architecture builds
     steps:
       # Step 1: Check out the source code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Set up GoReleaser
-      - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+      # Step 2: Set up Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22.2
 
-      # Step 3: Run GoReleaser based on branch or tag
-      - name: Run GoReleaser
-        run: |
-          if [[ "${GITHUB_REF}" == refs/heads/master || "${GITHUB_REF}" == refs/heads/dev ]]; then
-            goreleaser --snapshot --rm-dist  # Use snapshot for branches
-          else
-            goreleaser release --rm-dist  # Full release for tags
-          fi
+      # Step 3: Build using SLSA generator for Go
+      - name: Build using SLSA
+        uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v1.10.0
+        with:
+          go-version: 1.22.2
+          # We define architectures directly in the matrix
+          goarch: ${{ matrix.goarch }}
+
+      # Step 4: Upload the artifact to the release if on a tag
+      - name: Upload binary to GitHub
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: "binary-${{ matrix.goarch }}"
+          asset_name: "slurm_exporter-${{ github.ref_name }}-linux-${{ matrix.goarch }}"
+          asset_content_type: application/octet-stream
