@@ -51,10 +51,10 @@ jobs:
           ARCHIVE_NAME=${PROJECT_NAME}-${VERSION}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
           tar -czf release/${ARCHIVE_NAME} -C bin ${PROJECT_NAME}
 
-      # Step 6: Create a new GitHub release using a custom secret
+      # Step 6: Create a new GitHub release using a custom secret (only once)
       - name: Create GitHub Release
-        id: create_release
         if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the custom secret token
@@ -65,13 +65,22 @@ jobs:
           draft: false
           prerelease: false
 
-      # Step 7: Upload the release assets for each architecture
+      # Step 7: Define the release URL as an output variable for all steps
+      - name: Set release upload URL
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: echo "UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_ENV
+
+      # Step 8: Upload the release assets for each architecture
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
         env:
+          UPLOAD_URL: ${{ env.UPLOAD_URL }}
           GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the custom secret for upload
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release/slurm_exporter-${{ github.ref_name || github.event.inputs.version }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-          asset_name: slurm_exporter-${{ github.ref_name || github.event.inputs.version }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-          asset_content_type: application/gzip
+        run: |
+          asset_path=release/slurm_exporter-${{ github.ref_name || github.event.inputs.version }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          asset_name=slurm_exporter-${{ github.ref_name || github.event.inputs.version }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          curl \
+            -X POST \
+            -H "Authorization: token ${{ secrets.MY_RELEASE_TOKEN }}" \
+            -H "Content-Type: application/gzip" \
+            --data-binary @"$asset_path" \
+            "${UPLOAD_URL}?name=$asset_name"
