@@ -17,12 +17,15 @@ package main
 
 import (
 	"log"
+
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/prometheus/common/log"
 )
 
 type GPUsMetrics struct {

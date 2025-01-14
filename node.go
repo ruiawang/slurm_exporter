@@ -113,7 +113,6 @@ type NodeCollector struct {
 // It returns a set of collections for consumption
 func NewNodeCollector() *NodeCollector {
 	labels := []string{"node", "status", "partition"}
-
 	return &NodeCollector{
 		cpuAlloc:   prometheus.NewDesc("slurm_node_cpu_alloc", "Allocated CPUs per node", labels, nil),
 		cpuIdle:    prometheus.NewDesc("slurm_node_cpu_idle", "Idle CPUs per node", labels, nil),
@@ -157,6 +156,6 @@ func appendUnique(slice []string, value string) []string {
 		if v == value {
 			return slice
 		}
-	}
+}
 	return append(slice, value)
 }
