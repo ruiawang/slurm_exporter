@@ -1,28 +1,14 @@
-/* Copyright 2017 Victor Penso, Matteo Dessalvi
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-package main
+package collector
 
 import (
 	"io"
-	"log"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -55,20 +41,23 @@ type SchedulerMetrics struct {
 }
 
 // Execute the sdiag command and return its output
-func SchedulerData() []byte {
+func SchedulerData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("/usr/bin/sdiag")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
 // Extract the relevant metrics from the sdiag output
@@ -210,8 +199,12 @@ func ParseRpcStats(lines []string) []map[string]float64 {
 }
 
 // Returns the scheduler metrics
-func SchedulerGetMetrics() *SchedulerMetrics {
-	return ParseSchedulerMetrics(SchedulerData())
+func SchedulerGetMetrics(logger log.Logger) (*SchedulerMetrics, error) {
+	data, err := SchedulerData(logger)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSchedulerMetrics(data), nil
 }
 
 /*
@@ -240,6 +233,7 @@ type SchedulerCollector struct {
 	user_rpc_stats_count              *prometheus.Desc
 	user_rpc_stats_avg_time           *prometheus.Desc
 	user_rpc_stats_total_time         *prometheus.Desc
+	logger                            log.Logger
 }
 
 // Send all metric descriptions
@@ -266,7 +260,11 @@ func (c *SchedulerCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Send the values of all metrics
 func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
-	sm := SchedulerGetMetrics()
+	sm, err := SchedulerGetMetrics(sc.logger)
+	if err != nil {
+		level.Error(sc.logger).Log("msg", "Failed to get scheduler metrics", "err", err)
+		return
+	}
 	ch <- prometheus.MustNewConstMetric(sc.threads, prometheus.GaugeValue, sm.threads)
 	ch <- prometheus.MustNewConstMetric(sc.queue_size, prometheus.GaugeValue, sm.queue_size)
 	ch <- prometheus.MustNewConstMetric(sc.dbd_queue_size, prometheus.GaugeValue, sm.dbd_queue_size)
@@ -301,7 +299,7 @@ func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // Returns the Slurm scheduler collector, used to register with the prometheus client
-func NewSchedulerCollector() *SchedulerCollector {
+func NewSchedulerCollector(logger log.Logger) *SchedulerCollector {
 	rpc_stats_labels := make([]string, 0, 1)
 	rpc_stats_labels = append(rpc_stats_labels, "operation")
 	user_rpc_stats_labels := make([]string, 0, 1)
@@ -397,5 +395,6 @@ func NewSchedulerCollector() *SchedulerCollector {
 			"Information provided by the Slurm sdiag command, rpc total time statistic per user",
 			user_rpc_stats_labels,
 			nil),
+		logger: logger,
 	}
 }

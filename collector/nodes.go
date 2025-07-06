@@ -1,29 +1,15 @@
-/* Copyright 2017 Victor Penso, Matteo Dessalvi
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-package main
+package collector
 
 import (
 	"io"
-	"log"
 	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -43,26 +29,15 @@ type NodesMetrics struct {
 	total   map[string]float64
 }
 
-func NodesGetMetrics(part string) *NodesMetrics {
-	return ParseNodesMetrics(NodesData(part))
-}
-
-func RemoveDuplicates(s []string) []string {
-	m := map[string]bool{}
-	t := []string{}
-
-	// Walk through the slice 's' and for each value we haven't seen so far, append it to 't'.
-	for _, v := range s {
-		if _, seen := m[v]; !seen {
-			if len(v) > 0 {
-				t = append(t, v)
-				m[v] = true
-			}
-		}
+func NodesGetMetrics(logger log.Logger, part string) (*NodesMetrics, error) {
+	data, err := NodesData(logger, part)
+	if err != nil {
+		return nil, err
 	}
-
-	return t
+	return ParseNodesMetrics(data), nil
 }
+
+
 
 func InitFeatureSet(nm *NodesMetrics, feature_set string) {
 	//lint:file-ignore SA4018 If the feature set exists keep, else assign nil
@@ -159,60 +134,70 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 }
 
 // Execute the sinfo command and return its output
-func NodesData(part string) []byte {
+func NodesData(logger log.Logger, part string) ([]byte, error) {
 	cmd := exec.Command("sinfo", "-h", "-o %D|%T|%b", "-p", part, "| sort", "| uniq")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
-func SlurmGetTotal() float64 {
+func SlurmGetTotal(logger log.Logger) (float64, error) {
 	cmd := exec.Command("bash", "-c", "scontrol show nodes -o | grep -c NodeName=[a-z]*[0-9]*")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return 0, err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stderr pipe", "err", err)
+		return 0, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatalf("cmd.Start: %v", err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return 0, err
 	}
 	out, _ := io.ReadAll(stdout)
 	err_out, _ := io.ReadAll(stderr)
 	if err := cmd.Wait(); err != nil {
-		log.Fatalf("cmd.Wait: %v %s %s", err, out, err_out)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err, "stdout", string(out), "stderr", string(err_out))
+		return 0, err
 	}
 	data := strings.Split(string(out), "\n")
 	total, _ := strconv.ParseFloat(data[0], 64)
-	return total
+	return total, nil
 }
 
-func SlurmGetPartitions() []string {
+func SlurmGetPartitions(logger log.Logger) ([]string, error) {
 	cmd := exec.Command("sinfo", "-h", "-o %R", "| sort", "| uniq")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
 	partitions := strings.Split(string(out), "\n")
-	return partitions
+	return partitions, nil
 }
 
 /*
@@ -221,7 +206,7 @@ func SlurmGetPartitions() []string {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 
-func NewNodesCollector() *NodesCollector {
+func NewNodesCollector(logger log.Logger) *NodesCollector {
 	labelnames := make([]string, 0, 1)
 	labelnames = append(labelnames, "partition")
 	labelnames = append(labelnames, "active_feature_set")
@@ -239,6 +224,7 @@ func NewNodesCollector() *NodesCollector {
 		other:   prometheus.NewDesc("slurm_nodes_other", "Nodes reported with an unknown state", labelnames, nil),
 		planned: prometheus.NewDesc("slurm_nodes_planned", "Planned nodes", labelnames, nil),
 		total:   prometheus.NewDesc("slurm_nodes_total", "Total number of nodes", nil, nil),
+		logger:  logger,
 	}
 }
 
@@ -256,6 +242,7 @@ type NodesCollector struct {
 	other   *prometheus.Desc
 	planned *prometheus.Desc
 	total   *prometheus.Desc
+	logger  log.Logger
 }
 
 // Send all metric descriptions
@@ -282,13 +269,21 @@ func SendFeatureSetMetric(ch chan<- prometheus.Metric, desc *prometheus.Desc, va
 }
 
 func (nc *NodesCollector) Collect(ch chan<- prometheus.Metric) {
-	partitions := SlurmGetPartitions()
+	partitions, err := SlurmGetPartitions(nc.logger)
+	if err != nil {
+		level.Error(nc.logger).Log("msg", "Failed to get partitions", "err", err)
+		return
+	}
 	for _, part := range partitions {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
-		nm := NodesGetMetrics(part)
+		nm, err := NodesGetMetrics(nc.logger, part)
+		if err != nil {
+			level.Error(nc.logger).Log("msg", "Failed to get nodes metrics", "partition", part, "err", err)
+			continue
+		}
 		SendFeatureSetMetric(ch, nc.alloc, prometheus.GaugeValue, nm.alloc, part)
 		SendFeatureSetMetric(ch, nc.comp, prometheus.GaugeValue, nm.comp, part)
 		SendFeatureSetMetric(ch, nc.down, prometheus.GaugeValue, nm.down, part)
@@ -302,6 +297,10 @@ func (nc *NodesCollector) Collect(ch chan<- prometheus.Metric) {
 		SendFeatureSetMetric(ch, nc.other, prometheus.GaugeValue, nm.other, part)
 		SendFeatureSetMetric(ch, nc.planned, prometheus.GaugeValue, nm.planned, part)
 	}
-	total := SlurmGetTotal()
+	total, err := SlurmGetTotal(nc.logger)
+	if err != nil {
+		level.Error(nc.logger).Log("msg", "Failed to get total nodes", "err", err)
+		return
+	}
 	ch <- prometheus.MustNewConstMetric(nc.total, prometheus.GaugeValue, total)
 }

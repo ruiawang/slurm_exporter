@@ -1,45 +1,34 @@
-/* Copyright 2020 Victor Penso
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-package main
+package collector
 
 import (
 	"io"
-	"log"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func UsersData() []byte {
+func UsersData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("squeue", "-a", "-r", "-h", "-o %A|%u|%T|%C")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
 type UserJobMetrics struct {
@@ -49,9 +38,13 @@ type UserJobMetrics struct {
 	suspended    float64
 }
 
-func ParseUsersMetrics(input []byte) map[string]*UserJobMetrics {
+func ParseUsersMetrics(logger log.Logger) (map[string]*UserJobMetrics, error) {
 	users := make(map[string]*UserJobMetrics)
-	lines := strings.Split(string(input), "\n")
+	usersData, err := UsersData(logger)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(usersData), "\n")
 	for _, line := range lines {
 		if strings.Contains(line, "|") {
 			user := strings.Split(line, "|")[1]
@@ -76,7 +69,7 @@ func ParseUsersMetrics(input []byte) map[string]*UserJobMetrics {
 			}
 		}
 	}
-	return users
+	return users, nil
 }
 
 type UsersCollector struct {
@@ -84,15 +77,17 @@ type UsersCollector struct {
 	running      *prometheus.Desc
 	running_cpus *prometheus.Desc
 	suspended    *prometheus.Desc
+	logger       log.Logger
 }
 
-func NewUsersCollector() *UsersCollector {
+func NewUsersCollector(logger log.Logger) *UsersCollector {
 	labels := []string{"user"}
 	return &UsersCollector{
 		pending:      prometheus.NewDesc("slurm_user_jobs_pending", "Pending jobs for user", labels, nil),
 		running:      prometheus.NewDesc("slurm_user_jobs_running", "Running jobs for user", labels, nil),
 		running_cpus: prometheus.NewDesc("slurm_user_cpus_running", "Running cpus for user", labels, nil),
 		suspended:    prometheus.NewDesc("slurm_user_jobs_suspended", "Suspended jobs for user", labels, nil),
+		logger:       logger,
 	}
 }
 
@@ -104,7 +99,11 @@ func (uc *UsersCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (uc *UsersCollector) Collect(ch chan<- prometheus.Metric) {
-	um := ParseUsersMetrics(UsersData())
+	um, err := ParseUsersMetrics(uc.logger)
+	if err != nil {
+		level.Error(uc.logger).Log("msg", "Failed to parse users metrics", "err", err)
+		return
+	}
 	for u := range um {
 		if um[u].pending > 0 {
 			ch <- prometheus.MustNewConstMetric(uc.pending, prometheus.GaugeValue, um[u].pending, u)

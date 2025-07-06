@@ -1,27 +1,13 @@
-/* Copyright 2021 Chris Read
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-package main
+package collector
 
 import (
-	"log"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -37,8 +23,12 @@ type NodeMetrics struct {
 	partitions []string
 }
 
-func NodeGetMetrics() map[string]*NodeMetrics {
-	return ParseNodeMetrics(NodeData())
+func NodeGetMetrics(logger log.Logger) (map[string]*NodeMetrics, error) {
+	data, err := NodeData(logger)
+	if err != nil {
+		return nil, err
+	}
+	return ParseNodeMetrics(data), nil
 }
 
 // ParseNodeMetrics takes the output of sinfo with node data
@@ -90,13 +80,14 @@ func ParseNodeMetrics(input []byte) map[string]*NodeMetrics {
 
 // NodeData executes the sinfo command to get data for each node
 // It returns the output of the sinfo command
-func NodeData() []byte {
+func NodeData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("sinfo", "-h", "-N", "-O", "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition")
 	out, err := cmd.Output()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to execute sinfo command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
 type NodeCollector struct {
@@ -107,11 +98,12 @@ type NodeCollector struct {
 	memAlloc   *prometheus.Desc
 	memTotal   *prometheus.Desc
 	nodeStatus *prometheus.Desc
+	logger     log.Logger
 }
 
 // NewNodeCollector creates a Prometheus collector to keep all our stats in
 // It returns a set of collections for consumption
-func NewNodeCollector() *NodeCollector {
+func NewNodeCollector(logger log.Logger) *NodeCollector {
 	labels := []string{"node", "status", "partition"}
 	return &NodeCollector{
 		cpuAlloc:   prometheus.NewDesc("slurm_node_cpu_alloc", "Allocated CPUs per node", labels, nil),
@@ -121,6 +113,7 @@ func NewNodeCollector() *NodeCollector {
 		memAlloc:   prometheus.NewDesc("slurm_node_mem_alloc", "Allocated memory per node", labels, nil),
 		memTotal:   prometheus.NewDesc("slurm_node_mem_total", "Total memory per node", labels, nil),
 		nodeStatus: prometheus.NewDesc("slurm_node_status", "Node Status with partition", labels, nil),
+		logger:     logger,
 	}
 }
 
@@ -136,7 +129,11 @@ func (nc *NodeCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (nc *NodeCollector) Collect(ch chan<- prometheus.Metric) {
-	nodes := NodeGetMetrics()
+	nodes, err := NodeGetMetrics(nc.logger)
+	if err != nil {
+		level.Error(nc.logger).Log("msg", "Failed to get node metrics", "err", err)
+		return
+	}
 	for node, metrics := range nodes {
 		for _, partition := range metrics.partitions {
 			ch <- prometheus.MustNewConstMetric(nc.cpuAlloc, prometheus.GaugeValue, float64(metrics.cpuAlloc), node, metrics.nodeStatus, partition)
@@ -158,4 +155,17 @@ func appendUnique(slice []string, value string) []string {
 		}
 }
 	return append(slice, value)
+}
+
+// RemoveDuplicates removes duplicate strings from a slice
+func RemoveDuplicates(slice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range slice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }

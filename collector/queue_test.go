@@ -13,7 +13,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 
-package main
+package collector
 
 import (
 	"io"
@@ -21,9 +21,9 @@ import (
 	"testing"
 )
 
-func TestSchedulerMetrics(t *testing.T) {
+func TestParseQueueMetrics(t *testing.T) {
 	// Read the input data from a file
-	file, err := os.Open("test_data/sdiag.txt")
+	file, err := os.Open("test_data/squeue.txt")
 	if err != nil {
 		t.Fatalf("Can not open test data: %v", err)
 	}
@@ -31,5 +31,5 @@ func TestSchedulerMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Can not read test data: %v", err)
 	}
-	t.Logf("%+v", ParseSchedulerMetrics(data))
+	t.Logf("%+v", ParseQueueMetrics(data))
 }

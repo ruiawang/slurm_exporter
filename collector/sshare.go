@@ -1,53 +1,46 @@
-/* Copyright 2021 Victor Penso
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-package main
+package collector
 
 import (
 	"io"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func FairShareData() []byte {
+func FairShareData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("sshare", "-n", "-P", "-o", "account,fairshare")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
 type FairShareMetrics struct {
 	fairshare float64
 }
 
-func ParseFairShareMetrics() map[string]*FairShareMetrics {
+func ParseFairShareMetrics(logger log.Logger) (map[string]*FairShareMetrics, error) {
 	accounts := make(map[string]*FairShareMetrics)
-	lines := strings.Split(string(FairShareData()), "\n")
+	fairShareData, err := FairShareData(logger)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(fairShareData), "\n")
 	for _, line := range lines {
 		if !strings.HasPrefix(line, "  ") {
 			if strings.Contains(line, "|") {
@@ -61,17 +54,19 @@ func ParseFairShareMetrics() map[string]*FairShareMetrics {
 			}
 		}
 	}
-	return accounts
+	return accounts, nil
 }
 
 type FairShareCollector struct {
 	fairshare *prometheus.Desc
+	logger    log.Logger
 }
 
-func NewFairShareCollector() *FairShareCollector {
+func NewFairShareCollector(logger log.Logger) *FairShareCollector {
 	labels := []string{"account"}
 	return &FairShareCollector{
 		fairshare: prometheus.NewDesc("slurm_account_fairshare", "FairShare for account", labels, nil),
+		logger:    logger,
 	}
 }
 
@@ -80,7 +75,11 @@ func (fsc *FairShareCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (fsc *FairShareCollector) Collect(ch chan<- prometheus.Metric) {
-	fsm := ParseFairShareMetrics()
+	fsm, err := ParseFairShareMetrics(fsc.logger)
+	if err != nil {
+		level.Error(fsc.logger).Log("msg", "Failed to parse fairshare metrics", "err", err)
+		return
+	}
 	for f := range fsm {
 		ch <- prometheus.MustNewConstMetric(fsc.fairshare, prometheus.GaugeValue, fsm[f].fairshare, f)
 	}

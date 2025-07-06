@@ -13,15 +13,16 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 
-package main
+package collector
 
 import (
 	"io"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -32,8 +33,12 @@ type CPUsMetrics struct {
 	total float64
 }
 
-func CPUsGetMetrics() *CPUsMetrics {
-	return ParseCPUsMetrics(CPUsData())
+func CPUsGetMetrics(logger log.Logger) (*CPUsMetrics, error) {
+	data, err := CPUsData(logger)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCPUsMetrics(data), nil
 }
 
 func ParseCPUsMetrics(input []byte) *CPUsMetrics {
@@ -49,20 +54,23 @@ func ParseCPUsMetrics(input []byte) *CPUsMetrics {
 }
 
 // Execute the sinfo command and return its output
-func CPUsData() []byte {
+func CPUsData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("sinfo", "-h", "-o %C")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
 /*
@@ -71,20 +79,22 @@ func CPUsData() []byte {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 
-func NewCPUsCollector() *CPUsCollector {
+func NewCPUsCollector(logger log.Logger) *CPUsCollector {
 	return &CPUsCollector{
-		alloc: prometheus.NewDesc("slurm_cpus_alloc", "Allocated CPUs", nil, nil),
-		idle:  prometheus.NewDesc("slurm_cpus_idle", "Idle CPUs", nil, nil),
-		other: prometheus.NewDesc("slurm_cpus_other", "Mix CPUs", nil, nil),
-		total: prometheus.NewDesc("slurm_cpus_total", "Total CPUs", nil, nil),
+		alloc:  prometheus.NewDesc("slurm_cpus_alloc", "Allocated CPUs", nil, nil),
+		idle:   prometheus.NewDesc("slurm_cpus_idle", "Idle CPUs", nil, nil),
+		other:  prometheus.NewDesc("slurm_cpus_other", "Mix CPUs", nil, nil),
+		total:  prometheus.NewDesc("slurm_cpus_total", "Total CPUs", nil, nil),
+		logger: logger,
 	}
 }
 
 type CPUsCollector struct {
-	alloc *prometheus.Desc
-	idle  *prometheus.Desc
-	other *prometheus.Desc
-	total *prometheus.Desc
+	alloc  *prometheus.Desc
+	idle   *prometheus.Desc
+	other  *prometheus.Desc
+	total  *prometheus.Desc
+	logger log.Logger
 }
 
 // Send all metric descriptions
@@ -95,7 +105,11 @@ func (cc *CPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- cc.total
 }
 func (cc *CPUsCollector) Collect(ch chan<- prometheus.Metric) {
-	cm := CPUsGetMetrics()
+	cm, err := CPUsGetMetrics(cc.logger)
+	if err != nil {
+		level.Error(cc.logger).Log("msg", "Failed to get CPUs metrics", "err", err)
+		return
+	}
 	ch <- prometheus.MustNewConstMetric(cc.alloc, prometheus.GaugeValue, cm.alloc)
 	ch <- prometheus.MustNewConstMetric(cc.idle, prometheus.GaugeValue, cm.idle)
 	ch <- prometheus.MustNewConstMetric(cc.other, prometheus.GaugeValue, cm.other)

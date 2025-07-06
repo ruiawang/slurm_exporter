@@ -1,27 +1,13 @@
-/* Copyright 2017 Victor Penso, Matteo Dessalvi
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-package main
+package collector
 
 import (
 	"io"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -54,8 +40,12 @@ type QueueMetrics struct {
 }
 
 // Returns the scheduler metrics
-func QueueGetMetrics() *QueueMetrics {
-	return ParseQueueMetrics(QueueData())
+func QueueGetMetrics(logger log.Logger) (*QueueMetrics, error) {
+	data, err := QueueData(logger)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueueMetrics(data), nil
 }
 
 func (s *NVal) Incr(user string, part string, count float64) {
@@ -159,20 +149,23 @@ func ParseQueueMetrics(input []byte) *QueueMetrics {
 }
 
 // Execute the squeue command and return its output
-func QueueData() []byte {
+func QueueData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("/usr/bin/squeue", "-h", "-o %P,%T,%C,%r,%u")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
 /*
@@ -181,7 +174,7 @@ func QueueData() []byte {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 
-func NewQueueCollector() *QueueCollector {
+func NewQueueCollector(logger log.Logger) *QueueCollector {
 	return &QueueCollector{
 		pending:           prometheus.NewDesc("slurm_queue_pending", "Pending jobs in queue", []string{"user", "partition", "reason"}, nil),
 		running:           prometheus.NewDesc("slurm_queue_running", "Running jobs in the cluster", []string{"user", "partition"}, nil),
@@ -205,6 +198,7 @@ func NewQueueCollector() *QueueCollector {
 		cores_timeout:     prometheus.NewDesc("slurm_cores_timeout", "Cores stopped by timeout", []string{"user", "partition"}, nil),
 		cores_preempted:   prometheus.NewDesc("slurm_cores_preempted", "Number of preempted cores", []string{"user", "partition"}, nil),
 		cores_node_fail:   prometheus.NewDesc("slurm_cores_node_fail", "Number of cores stopped due to node fail", []string{"user", "partition"}, nil),
+		logger:            logger,
 	}
 }
 
@@ -231,6 +225,7 @@ type QueueCollector struct {
 	cores_timeout     *prometheus.Desc
 	cores_preempted   *prometheus.Desc
 	cores_node_fail   *prometheus.Desc
+	logger            log.Logger
 }
 
 func (qc *QueueCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -259,7 +254,11 @@ func (qc *QueueCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (qc *QueueCollector) Collect(ch chan<- prometheus.Metric) {
-	qm := QueueGetMetrics()
+	qm, err := QueueGetMetrics(qc.logger)
+	if err != nil {
+		level.Error(qc.logger).Log("msg", "Failed to get queue metrics", "err", err)
+		return
+	}
 	for reason, values := range qm.pending {
 		PushMetric(values, ch, qc.pending, reason)
 	}

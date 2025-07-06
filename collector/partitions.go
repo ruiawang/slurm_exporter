@@ -1,60 +1,52 @@
-/* Copyright 2020 Victor Penso
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-package main
+package collector
 
 import (
 	"io"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func PartitionsData() []byte {
+func PartitionsData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("sinfo", "-h", "-o%R,%C")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
-func PartitionsPendingJobsData() []byte {
+func PartitionsPendingJobsData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("squeue", "-a", "-r", "-h", "-o%P", "--states=PENDING")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
 type PartitionMetrics struct {
@@ -65,9 +57,13 @@ type PartitionMetrics struct {
 	total     float64
 }
 
-func ParsePartitionsMetrics() map[string]*PartitionMetrics {
+func ParsePartitionsMetrics(logger log.Logger) (map[string]*PartitionMetrics, error) {
 	partitions := make(map[string]*PartitionMetrics)
-	lines := strings.Split(string(PartitionsData()), "\n")
+	partitionsData, err := PartitionsData(logger)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(partitionsData), "\n")
 	for _, line := range lines {
 		if strings.Contains(line, ",") {
 			// name of a partition
@@ -88,7 +84,11 @@ func ParsePartitionsMetrics() map[string]*PartitionMetrics {
 		}
 	}
 	// get list of pending jobs by partition name
-	list := strings.Split(string(PartitionsPendingJobsData()), "\n")
+	pendingJobsData, err := PartitionsPendingJobsData(logger)
+	if err != nil {
+		return nil, err
+	}
+	list := strings.Split(string(pendingJobsData), "\n")
 	for _, partition := range list {
 		// accumulate the number of pending jobs
 		_, key := partitions[partition]
@@ -97,7 +97,7 @@ func ParsePartitionsMetrics() map[string]*PartitionMetrics {
 		}
 	}
 
-	return partitions
+	return partitions, nil
 }
 
 type PartitionsCollector struct {
@@ -106,9 +106,10 @@ type PartitionsCollector struct {
 	other     *prometheus.Desc
 	pending   *prometheus.Desc
 	total     *prometheus.Desc
+	logger    log.Logger
 }
 
-func NewPartitionsCollector() *PartitionsCollector {
+func NewPartitionsCollector(logger log.Logger) *PartitionsCollector {
 	labels := []string{"partition"}
 	return &PartitionsCollector{
 		allocated: prometheus.NewDesc("slurm_partition_cpus_allocated", "Allocated CPUs for partition", labels, nil),
@@ -116,6 +117,7 @@ func NewPartitionsCollector() *PartitionsCollector {
 		other:     prometheus.NewDesc("slurm_partition_cpus_other", "Other CPUs for partition", labels, nil),
 		pending:   prometheus.NewDesc("slurm_partition_jobs_pending", "Pending jobs for partition", labels, nil),
 		total:     prometheus.NewDesc("slurm_partition_cpus_total", "Total CPUs for partition", labels, nil),
+		logger:    logger,
 	}
 }
 
@@ -128,7 +130,11 @@ func (pc *PartitionsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (pc *PartitionsCollector) Collect(ch chan<- prometheus.Metric) {
-	pm := ParsePartitionsMetrics()
+	pm, err := ParsePartitionsMetrics(pc.logger)
+	if err != nil {
+		level.Error(pc.logger).Log("msg", "Failed to parse partitions metrics", "err", err)
+		return
+	}
 	for p := range pm {
 		if pm[p].allocated > 0 {
 			ch <- prometheus.MustNewConstMetric(pc.allocated, prometheus.GaugeValue, pm[p].allocated, p)

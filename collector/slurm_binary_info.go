@@ -1,25 +1,11 @@
-/* Copyright 2017 Thomas Bourcey
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-package main
+package collector
 
 import (
-	"log"
 	"os/exec"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -27,10 +13,11 @@ import (
 type SlurmInfoCollector struct {
 	slurmInfo *prometheus.Desc
 	binaries  []string
+	logger    log.Logger
 }
 
 // NewSlurmInfoCollector initializes a new SlurmInfoCollector
-func NewSlurmInfoCollector() *SlurmInfoCollector {
+func NewSlurmInfoCollector(logger log.Logger) *SlurmInfoCollector {
 	binaries := []string{
 		"sinfo", "squeue", "sdiag", "scontrol",
 		"sacct", "sbatch", "salloc", "srun",
@@ -39,6 +26,7 @@ func NewSlurmInfoCollector() *SlurmInfoCollector {
 	return &SlurmInfoCollector{
 		slurmInfo: prometheus.NewDesc("slurm_info", "Information on Slurm version and binaries", labels, nil),
 		binaries:  binaries,
+		logger:    logger,
 	}
 }
 
@@ -50,7 +38,7 @@ func (c *SlurmInfoCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect gathers the Slurm information and sends it as a metric to Prometheus
 func (c *SlurmInfoCollector) Collect(ch chan<- prometheus.Metric) {
 	// Get the general Slurm version
-	version, found := GetBinaryVersion("sinfo")
+	version, found := GetBinaryVersion(c.logger, "sinfo")
 	versionValue := 0.0
 	if found {
 		versionValue = 1.0
@@ -60,7 +48,7 @@ func (c *SlurmInfoCollector) Collect(ch chan<- prometheus.Metric) {
 
 	// Check each binary and send their availability and version
 	for _, binary := range c.binaries {
-		binVersion, binFound := GetBinaryVersion(binary)
+		binVersion, binFound := GetBinaryVersion(c.logger, binary)
 		binValue := 0.0
 		if binFound {
 			binValue = 1.0
@@ -70,11 +58,11 @@ func (c *SlurmInfoCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // getBinaryVersion checks if a Slurm binary is installed and returns its version string
-func GetBinaryVersion(binary string) (string, bool) {
+func GetBinaryVersion(logger log.Logger, binary string) (string, bool) {
 	cmd := exec.Command(binary, "--version")
 	output, err := cmd.Output()
 	if err != nil {
-		log.Printf("Binary %s not found: %v", binary, err)
+		level.Error(logger).Log("msg", "Binary not found", "binary", binary, "err", err)
 		return "not_found", false
 	}
 

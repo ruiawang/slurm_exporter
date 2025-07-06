@@ -13,33 +13,37 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 
-package main
+package collector
 
 import (
 	"io"
-	"log"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func AccountsData() []byte {
+func AccountsData(logger log.Logger) ([]byte, error) {
 	cmd := exec.Command("squeue", "-a", "-r", "-h", "-o %A|%a|%T|%C")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to start command", "err", err)
+		return nil, err
 	}
 	out, _ := io.ReadAll(stdout)
 	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
+		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
+		return nil, err
 	}
-	return out
+	return out, nil
 }
 
 type JobMetrics struct {
@@ -84,15 +88,17 @@ type AccountsCollector struct {
 	running      *prometheus.Desc
 	running_cpus *prometheus.Desc
 	suspended    *prometheus.Desc
+	logger       log.Logger
 }
 
-func NewAccountsCollector() *AccountsCollector {
+func NewAccountsCollector(logger log.Logger) *AccountsCollector {
 	labels := []string{"account"}
 	return &AccountsCollector{
 		pending:      prometheus.NewDesc("slurm_account_jobs_pending", "Pending jobs for account", labels, nil),
 		running:      prometheus.NewDesc("slurm_account_jobs_running", "Running jobs for account", labels, nil),
 		running_cpus: prometheus.NewDesc("slurm_account_cpus_running", "Running cpus for account", labels, nil),
 		suspended:    prometheus.NewDesc("slurm_account_jobs_suspended", "Suspended jobs for account", labels, nil),
+		logger:       logger,
 	}
 }
 
@@ -104,7 +110,12 @@ func (ac *AccountsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (ac *AccountsCollector) Collect(ch chan<- prometheus.Metric) {
-	am := ParseAccountsMetrics(AccountsData())
+	data, err := AccountsData(ac.logger)
+	if err != nil {
+		level.Error(ac.logger).Log("msg", "Failed to get accounts data", "err", err)
+		return
+	}
+	am := ParseAccountsMetrics(data)
 	for a := range am {
 		if am[a].pending > 0 {
 			ch <- prometheus.MustNewConstMetric(ac.pending, prometheus.GaugeValue, am[a].pending, a)

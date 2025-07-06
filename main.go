@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/alecthomas/kingpin/v2"
+	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -28,6 +29,8 @@ import (
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
+
+	"github.com/sckyzo/slurm_exporter/collector"
 )
 
 var (
@@ -44,23 +47,23 @@ const indexHTML = `<html>
 	</body>
 </html>`
 
-func registerCollectors(gpuAcct bool) {
+func registerCollectors(logger log.Logger, gpuAcct bool) {
 	collectors := []prometheus.Collector{
-		NewAccountsCollector(),
-		NewCPUsCollector(),
-		NewNodesCollector(),
-		NewNodeCollector(),
-		NewPartitionsCollector(),
-		NewQueueCollector(),
-		NewSchedulerCollector(),
-		NewFairShareCollector(),
-		NewUsersCollector(),
-		NewSlurmInfoCollector(),
+		collector.NewAccountsCollector(logger),
+		collector.NewCPUsCollector(logger),
+		collector.NewNodesCollector(logger),
+		collector.NewNodeCollector(logger),
+		collector.NewPartitionsCollector(logger),
+		collector.NewQueueCollector(logger),
+		collector.NewSchedulerCollector(logger),
+		collector.NewFairShareCollector(logger),
+		collector.NewUsersCollector(logger),
+		collector.NewSlurmInfoCollector(logger),
 	}
 
 	// Register GPU collector if enabled
 	if gpuAcct {
-		collectors = append(collectors, NewGPUsCollector())
+		collectors = append(collectors, collector.NewGPUsCollector(logger))
 	}
 
 	// Register all collectors
@@ -82,7 +85,7 @@ func main() {
 	prometheus.MustRegister(collectors.NewBuildInfoCollector())
 
 	// Register collectors based on the GPU accounting flag
-	registerCollectors(*gpuAcct)
+	registerCollectors(logger, *gpuAcct)
 
 	// Log server startup details
 	level.Info(logger).Log("msg", "Starting Server with GPUs Accounting", "enabled", *gpuAcct)
