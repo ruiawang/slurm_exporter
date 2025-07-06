@@ -2,85 +2,47 @@ name: Release
 
 on:
   push:
+    branches:
+      - master
     tags:
-      - '[0-9]+.*'  # Trigger the workflow for tags like 0.20, 1.0, etc.
-  workflow_dispatch:  # Allows manual triggering of the workflow
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
-  release:
-    name: Multi-Arch Build and Release
+  test:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        goos: [linux]
-        goarch: [386, amd64, arm64]  # Build for x86, x64, and arm64 architectures
-        go_version: [1.22]
-
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
-      # Step 1: Check out the source code from the repository
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          cache: true
+      - run: make test
 
-      # Step 2: Set up the Go environment
+  release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go_version }}
-
-      # Step 3: Install Go dependencies
-      - name: Install Go dependencies
-        run: |
-          go mod tidy
-          go mod download
-
-      # Step 4: Build the binary for each architecture
-      - name: Build binary for ${{ matrix.goos }}-${{ matrix.goarch }}
-        run: |
-          mkdir -p bin
-          PROJECT_NAME=slurm_exporter
-          VERSION=${{ github.ref_name || github.event.inputs.version }}  # Use the version provided by tag or manual input
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o bin/${PROJECT_NAME}
-
-      # Step 5: Create release archives in the desired format
-      - name: Create release archive for ${{ matrix.goos }}-${{ matrix.goarch }}
-        run: |
-          mkdir -p release
-          PROJECT_NAME=slurm_exporter
-          VERSION=${{ github.ref_name || github.event.inputs.version }}  # Handle manual version input
-          ARCHIVE_NAME=${PROJECT_NAME}-${VERSION}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-          tar -czf release/${ARCHIVE_NAME} -C bin ${PROJECT_NAME}
-
-      # Step 6: Create a new GitHub release using a custom secret (only once)
-      - name: Create GitHub Release
-        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the custom secret token
+          go-version: 1.22
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
         with:
-          tag_name: ${{ github.ref_name || github.event.inputs.version }}
-          release_name: Release ${{ github.ref_name || github.event.inputs.version }}
-          body: "Release version ${{ github.ref_name || github.event.inputs.version }} with multi-architecture support."
-          draft: false
-          prerelease: false
-
-      # Step 7: Define the release URL as an output variable for all steps
-      - name: Set release upload URL
-        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
-        run: echo "UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_ENV
-
-      # Step 8: Upload the release assets for each architecture
-      - name: Upload Release Asset
+          distribution: goreleaser
+          version: latest
+          args: release --clean
         env:
-          UPLOAD_URL: ${{ env.UPLOAD_URL }}
-          GITHUB_TOKEN: ${{ secrets.MY_RELEASE_TOKEN }}  # Use the custom secret for upload
-        run: |
-          asset_path=release/slurm_exporter-${{ github.ref_name || github.event.inputs.version }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-          asset_name=slurm_exporter-${{ github.ref_name || github.event.inputs.version }}.${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-          curl \
-            -X POST \
-            -H "Authorization: token ${{ secrets.MY_RELEASE_TOKEN }}" \
-            -H "Content-Type: application/gzip" \
-            --data-binary @"$asset_path" \
-            "${UPLOAD_URL}?name=$asset_name"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

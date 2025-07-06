@@ -33,7 +33,6 @@ archives:
       - README.md
       - LICENSE
       - CHANGELOG.md
-      - bin/slurm_exporter
 
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
@@ -41,3 +40,7 @@ checksum:
 # Define signing settings (if Cosign is set up later)
 signs:
   - artifacts: checksum
+
+slsa:
+  github:
+    runs_on: ubuntu-latest
