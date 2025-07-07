@@ -1,4 +1,4 @@
-# .goreleaser.snapshot.yaml
+# .goreleaser.dev.yaml
 
 project_name: slurm_exporter
 
@@ -6,7 +6,7 @@ release:
   disable: true
 
 builds:
-  - id: slurm_exporter-snapshot
+  - id: slurm_exporter-dev
     goos:
       - linux
     goarch:
@@ -24,10 +24,10 @@ builds:
       - CGO_ENABLED=0
 
 archives:
-  - id: slurm_exporter-snapshot-archive
-    builds: [slurm_exporter-snapshot]
+  - id: slurm_exporter-dev-archive
+    builds: [slurm_exporter-dev]
     format: tar.gz
-    name_template: "{{ .ProjectName }}.snapshot"
+    name_template: "{{ .ProjectName }}.dev"
     files:
       - README.md
       - LICENSE

@@ -24,7 +24,7 @@ jobs:
           cache: true
       - run: make test
 
-  snapshot:
+  dev:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: test
@@ -50,13 +50,13 @@ jobs:
           echo "GORELEASER_CURRENT_TAG: ${{ env.GORELEASER_CURRENT_TAG }}"
           echo "PATH: $PATH"
           echo "Current directory: $(pwd)"
-          ls -l .goreleaser.snapshot.yaml
-      - name: Run GoReleaser Snapshot
+          ls -l .goreleaser.dev.yaml
+      - name: Run GoReleaser Dev
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: --snapshot --clean --skip=sign --config .goreleaser.snapshot.yaml
+          args: --snapshot --clean --skip=sign --config .goreleaser.dev.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ env.GORELEASER_CURRENT_TAG }}
@@ -64,14 +64,14 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           BRANCH_NAME: ${{ github.ref_name }}
           REVISION: ${{ github.sha }}
-      - name: Rename Snapshot Archive
+      - name: Rename Dev Archive
         run: |
-          mv dist/slurm_exporter.snapshot.tar.gz dist/slurm_exporter.snapshot.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
-      - name: Upload Snapshot Archive (Linux AMD64)
+          mv dist/slurm_exporter.dev.tar.gz dist/slurm_exporter.dev.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+      - name: Upload Dev Archive (Linux AMD64)
         uses: actions/upload-artifact@v4
         with:
-          name: slurm_exporter.snapshot.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
-          path: dist/slurm_exporter.snapshot.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+          name: slurm_exporter.dev.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+          path: dist/slurm_exporter.dev.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
       - name: Upload Checksums
         uses: actions/upload-artifact@v4
         with:
