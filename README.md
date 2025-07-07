@@ -8,13 +8,23 @@ Prometheus collector and exporter for metrics extracted from the [Slurm](https:/
 
 ## Table of Contents
 
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Metrics](#metrics)
-- [Prometheus Configuration](#prometheus-configuration)
-- [Grafana Dashboard](#grafana-dashboard)
-- [License](#license)
+- [Prometheus Slurm Exporter](#prometheus-slurm-exporter)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Installation](#installation)
+  - [Usage](#usage)
+  - [Metrics](#metrics)
+    - [CPU Metrics](#cpu-metrics)
+    - [GPU Metrics](#gpu-metrics)
+    - [Node Metrics](#node-metrics)
+      - [Additional Node Usage Info](#additional-node-usage-info)
+    - [Job Metrics](#job-metrics)
+    - [Partition Metrics](#partition-metrics)
+    - [Jobs per Account and User](#jobs-per-account-and-user)
+    - [Scheduler Metrics](#scheduler-metrics)
+  - [Prometheus Configuration](#prometheus-configuration)
+  - [Grafana Dashboard](#grafana-dashboard)
+  - [License](#license)
 
 ---
 
