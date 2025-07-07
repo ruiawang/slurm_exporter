@@ -22,7 +22,12 @@ builds:
     binary: "{{ .ProjectName }}"
     main: "."
     ldflags:
-      - "-s -w -X main.version={{ .Version }}"
+      - "-s -w"
+      - "-X=github.com/prometheus/common/version.Version={{.Version}}"
+      - "-X=github.com/prometheus/common/version.Revision={{.Commit}}"
+      - "-X=github.com/prometheus/common/version.Branch={{.Branch}}"
+      - "-X=github.com/prometheus/common/version.BuildUser={{.Env.BUILD_USER}}"
+      - "-X=github.com/prometheus/common/version.BuildDate={{.Env.BUILD_DATE}}"
     env:
       - CGO_ENABLED=0
   

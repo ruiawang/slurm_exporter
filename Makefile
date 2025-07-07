@@ -15,7 +15,22 @@ GOPATH_ENV := GOPATH=$(GOPATH) PATH=$(shell pwd)/go/bin:$(PATH)
 SHELL := $(shell which bash) -eu -o pipefail
 
 # Check if the installed Go version matches the required version
-GO_INSTALLED_VERSION := $(shell go version 2>/dev/null | awk '{print $$3}' | sed 's/go//g')
+VERSION ?= $(shell git describe --tags --always --dirty --abbrev=7 || echo "untagged")
+REVISION ?= $(shell git rev-parse HEAD)
+BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
+BUILD_USER ?= $(shell git config user.name) <$(shell git config user.email)>
+BUILD_DATE ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+# LDFLAGS for injecting version information
+LDFLAGS = \
+	-X 'github.com/prometheus/common/version.Version=$(VERSION)' \
+	-X 'github.com/prometheus/common/version.Revision=$(REVISION)' \
+	-X 'github.com/prometheus/common/version.Branch=$(BRANCH)' \
+	-X 'github.com/prometheus/common/version.BuildUser=$(BUILD_USER)' \
+	-X 'github.com/prometheus/common/version.BuildDate=$(BUILD_DATE)'
+
+# Check if the installed Go version matches the required version
+GO_INSTALLED_VERSION := $(shell go version 2>/dev/null | awk '{print $3}' | sed 's/go//g')
 
 .PHONY: all
 all: setup build
@@ -44,7 +59,7 @@ build: $(GOBIN)
 $(GOBIN): go/modules/pkg/mod $(GOFILES)
 	@echo "Building $(GOBIN)"
 	mkdir -p bin
-	CGO_ENABLED=0 go build -v -o $(GOBIN)
+	CGO_ENABLED=0 go build -v -ldflags "$(LDFLAGS)" -o $(GOBIN)
 
 # Target to download Go modules
 go/modules/pkg/mod: go.mod
