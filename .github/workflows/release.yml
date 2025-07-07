@@ -46,10 +46,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: "v0.0.0-snapshot-${{ github.sha }}"
+      - name: Get current date for artifact name
+        id: date
+        run: echo "ARTIFACT_DATE=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
       - name: Upload Snapshot Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: slurm_exporter-snapshot-${{ format-time(github.event.head_commit.timestamp, 'YYYYMMDD-HHmmss') }}
+          name: slurm_exporter-snapshot-${{ steps.date.outputs.ARTIFACT_DATE }}
           path: dist/
 
   release:
