@@ -41,6 +41,4 @@ checksum:
 signs:
   - artifacts: checksum
 
-slsa:
-  github:
-    runs_on: ubuntu-latest
+
