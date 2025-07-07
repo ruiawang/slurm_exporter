@@ -41,10 +41,11 @@ jobs:
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
-          version: v1.27.0
-          args: --snapshot --clean --skip=validate
+          version: latest
+          args: --snapshot --clean --skip=sign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: "v0.0.0-snapshot-${{ github.sha }}"
 
   release:
     runs-on: ubuntu-latest
