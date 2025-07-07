@@ -48,14 +48,14 @@ jobs:
           echo "Current directory: $(pwd)"
           ls -l .goreleaser.snapshot.yaml
       - name: Run GoReleaser Snapshot
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
           args: --snapshot --clean --skip=sign --config .goreleaser.snapshot.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: "v0.0.0-snapshot"
+          GORELEASER_CURRENT_TAG: "dev-snapshot"
           BUILD_USER: "${{ github.actor }}"
           BUILD_DATE: ${{ env.BUILD_DATE }}
           BRANCH_NAME: ${{ github.ref_name }}
