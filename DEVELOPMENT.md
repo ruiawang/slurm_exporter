@@ -1,56 +1,77 @@
 # Development
 
-Setup the development environment on a node with access to the Slurm user
-command-line interface, in particular with the `sinfo`, `squeue`, and `sdiag`
-commands.
+This project requires access to a node with the Slurm CLI (`sinfo`, `squeue`, `sdiag`, ...).
 
-## Install Go from source
+## Prerequisites
 
-```bash
-export VERSION=1.15 OS=linux ARCH=amd64
-wget https://dl.google.com/go/go$VERSION.$OS-$ARCH.tar.gz
-tar -xzvf go$VERSION.$OS-$ARCH.tar.gz
-export PATH=$PWD/go/bin:$PATH
-```
+- [Go](https://golang.org/dl/) (version 1.22 or higher recommended)
+- Slurm CLI tools available in your `$PATH`
 
-_Alternatively install Go using the packaging system of your Linux distribution._
+## Setup
 
-## Clone this repository and build
-
-Use Git to clone the source code of the exporter, run all the tests and build the binary:
+Clone this repository:
 
 ```bash
-# clone the source code
-git clone https://github.com/vpenso/prometheus-slurm-exporter.git
-cd prometheus-slurm-exporter
-make
+git clone https://github.com/sckyzo/slurm_exporter.git
+cd slurm_exporter
 ```
 
-To just run the tests:
+If you need a specific Go version, the Makefile will try to detect your installed version or use the default (`1.22.2`).
+
+## Build
+
+To build the exporter binary:
+
+```bash
+make build
+```
+
+The binary will be available in `bin/slurm_exporter`.
+
+## Run tests
+
+To run all tests:
 
 ```bash
 make test
 ```
 
-Start the exporter (foreground), and query all metrics:
+## Clean build artifacts
 
 ```bash
-./bin/prometheus-slurm-exporter
+make clean
 ```
 
-If you wish to run the exporter on a different port, or the default port (8080) is already in use, run with the following argument:
+## Run the exporter
 
 ```bash
-./bin/prometheus-slurm-exporter --listen-address="0.0.0.0:<port>"
-...
+bin/slurm_exporter --web.listen-address=:8080
+```
 
-# query all metrics (default port)
+Or with GPU accounting enabled:
+
+```bash
+bin/slurm_exporter --web.listen-address=:8080 --gpus-acct
+```
+
+## Query metrics
+
+```bash
 curl http://localhost:8080/metrics
 ```
 
+## Advanced
+
+- You can override the Go version and architecture via environment variables:
+  ```bash
+  make build GO_VERSION=1.22.2 OS=linux ARCH=amd64
+  ```
+
+- The Makefile will automatically download and set up Go modules in a local `go/` directory if needed.
+
 ## References
 
-* [GOlang Package Documentation](https://godoc.org/github.com/prometheus/client_golang/prometheus)
-* [Metric Types](https://prometheus.io/docs/concepts/metric_types/)
+* [Go client_golang documentation](https://pkg.go.dev/github.com/prometheus/client_golang/prometheus)
+* [Prometheus Metric Types](https://prometheus.io/docs/concepts/metric_types/)
 * [Writing Exporters](https://prometheus.io/docs/instrumenting/writing_exporters/)
 * [Available Exporters](https://prometheus.io/docs/instrumenting/exporters/)
