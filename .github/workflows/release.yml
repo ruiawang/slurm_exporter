@@ -37,23 +37,38 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: 1.22
+      - name: Set BUILD_DATE environment variable
+        run: echo "BUILD_DATE=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
+      - name: Debug GoReleaser Environment Variables
+        run: |
+          echo "BRANCH_NAME: ${{ github.ref_name }}"
+          echo "BUILD_DATE: ${{ env.BUILD_DATE }}"
+          echo "GORELEASER_CURRENT_TAG: ${{ env.GORELEASER_CURRENT_TAG }}"
+          echo "PATH: $PATH"
+          echo "Current directory: $(pwd)"
+          ls -l .goreleaser.snapshot.yaml
       - name: Run GoReleaser Snapshot
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: latest
-          args: --snapshot --clean --skip=sign
+          args: --snapshot --clean --skip=sign --config .goreleaser.snapshot.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: "v0.0.0-snapshot-${{ github.sha }}"
-      - name: Get current date for artifact name
-        id: date
-        run: echo "ARTIFACT_DATE=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
-      - name: Upload Snapshot Artifacts
+          GORELEASER_CURRENT_TAG: "v0.0.0-snapshot"
+      - name: Rename Snapshot Archive
+        run: |
+          mv dist/slurm_exporter.snapshot.tar.gz dist/slurm_exporter.snapshot.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+      - name: Upload Snapshot Archive (Linux AMD64)
         uses: actions/upload-artifact@v4
         with:
-          name: slurm_exporter-snapshot-${{ steps.date.outputs.ARTIFACT_DATE }}
-          path: dist/
+          name: slurm_exporter.snapshot.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+          path: dist/slurm_exporter.snapshot.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+      - name: Upload Checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: slurm_exporter_checksums.txt
+          path: dist/slurm_exporter_checksums.txt
 
   release:
     runs-on: ubuntu-latest

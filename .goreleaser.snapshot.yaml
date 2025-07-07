@@ -1,0 +1,37 @@
+# .goreleaser.snapshot.yaml
+
+project_name: slurm_exporter
+
+release:
+  disable: true
+
+builds:
+  - id: slurm_exporter-snapshot
+    goos:
+      - linux
+    goarch:
+      - amd64
+    binary: "{{ .ProjectName }}"
+    main: "."
+    ldflags:
+      - "-s -w -X main.version={{ .Version }}"
+    env:
+      - CGO_ENABLED=0
+
+archives:
+  - id: slurm_exporter-snapshot-archive
+    builds: [slurm_exporter-snapshot]
+    format: tar.gz
+    name_template: "{{ .ProjectName }}.snapshot"
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+
+
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+
+signs:
+  - artifacts: checksum
