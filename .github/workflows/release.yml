@@ -42,7 +42,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: snapshot --clean
+          args: --snapshot --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
