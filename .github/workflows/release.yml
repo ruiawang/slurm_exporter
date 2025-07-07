@@ -46,6 +46,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: "v0.0.0-snapshot-${{ github.sha }}"
+      - name: Upload Snapshot Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: slurm_exporter-snapshot-${{ format-time(github.event.head_commit.timestamp, 'YYYYMMDD-HHmmss') }}
+          path: dist/
 
   release:
     runs-on: ubuntu-latest
