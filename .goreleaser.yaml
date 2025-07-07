@@ -1,12 +1,13 @@
-# .goreleaser.yml
+# .goreleaser.yaml
+
+version: 2
 
 project_name: slurm_exporter
 
 # Release configuration
 release:
   github:
-    owner: sckyzo  # Replace with your GitHub username or organization
-    name: slurm_exporter
+    owner: sckyzo 
   name_template: "{{ .ProjectName }} v{{ .Version }}"
 
 builds:
@@ -30,16 +31,14 @@ builds:
       - "-X=github.com/prometheus/common/version.BuildDate={{.Env.BUILD_DATE}}"
     env:
       - CGO_ENABLED=0
-  
 
 archives:
-  - format: tar.gz
+  - id: slurm_exporter-release-archive
     name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
     files:
       - README.md
       - LICENSE
       - CHANGELOG.md
-  
 
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"

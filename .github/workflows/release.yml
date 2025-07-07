@@ -66,12 +66,12 @@ jobs:
           REVISION: ${{ github.sha }}
       - name: Rename Dev Archive
         run: |
-          mv dist/slurm_exporter.dev.tar.gz dist/slurm_exporter.dev.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+          mv dist/slurm_exporter.dev.tar.gz dist/slurm_exporter.${{ env.GORELEASER_CURRENT_TAG }}.branch-${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
       - name: Upload Dev Archive (Linux AMD64)
         uses: actions/upload-artifact@v4
         with:
-          name: slurm_exporter.dev.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
-          path: dist/slurm_exporter.dev.${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+          name: slurm_exporter.${{ env.GORELEASER_CURRENT_TAG }}.branch-${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
+          path: dist/slurm_exporter.${{ env.GORELEASER_CURRENT_TAG }}.branch-${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
       - name: Upload Checksums
         uses: actions/upload-artifact@v4
         with:
