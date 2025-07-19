@@ -1,8 +1,6 @@
 package collector
 
 import (
-	"io"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,22 +11,7 @@ import (
 )
 
 func UsersData(logger log.Logger) ([]byte, error) {
-	cmd := exec.Command("squeue", "-a", "-r", "-h", "-o %A|%u|%T|%C")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		level.Error(logger).Log("msg", "Failed to start command", "err", err)
-		return nil, err
-	}
-	out, _ := io.ReadAll(stdout)
-	if err := cmd.Wait(); err != nil {
-		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
-		return nil, err
-	}
-	return out, nil
+	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%A|%u|%T|%C"})
 }
 
 type UserJobMetrics struct {

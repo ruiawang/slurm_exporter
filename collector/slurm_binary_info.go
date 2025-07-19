@@ -1,11 +1,9 @@
 package collector
 
 import (
-	"os/exec"
 	"strings"
 
 	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -59,10 +57,9 @@ func (c *SlurmInfoCollector) Collect(ch chan<- prometheus.Metric) {
 
 // getBinaryVersion checks if a Slurm binary is installed and returns its version string
 func GetBinaryVersion(logger log.Logger, binary string) (string, bool) {
-	cmd := exec.Command(binary, "--version")
-	output, err := cmd.Output()
+	output, err := Execute(logger, binary, []string{"--version"})
 	if err != nil {
-		level.Error(logger).Log("msg", "Binary not found", "binary", binary, "err", err)
+		// The Execute function already logs the error, so we just return.
 		return "not_found", false
 	}
 

@@ -1,8 +1,6 @@
 package collector
 
 import (
-	"io"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -12,41 +10,11 @@ import (
 )
 
 func PartitionsData(logger log.Logger) ([]byte, error) {
-	cmd := exec.Command("sinfo", "-h", "-o%R,%C")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		level.Error(logger).Log("msg", "Failed to start command", "err", err)
-		return nil, err
-	}
-	out, _ := io.ReadAll(stdout)
-	if err := cmd.Wait(); err != nil {
-		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
-		return nil, err
-	}
-	return out, nil
+	return Execute(logger, "sinfo", []string{"-h", "-o", "%R,%C"})
 }
 
 func PartitionsPendingJobsData(logger log.Logger) ([]byte, error) {
-	cmd := exec.Command("squeue", "-a", "-r", "-h", "-o%P", "--states=PENDING")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		level.Error(logger).Log("msg", "Failed to start command", "err", err)
-		return nil, err
-	}
-	out, _ := io.ReadAll(stdout)
-	if err := cmd.Wait(); err != nil {
-		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
-		return nil, err
-	}
-	return out, nil
+	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%P", "--states=PENDING"})
 }
 
 type PartitionMetrics struct {

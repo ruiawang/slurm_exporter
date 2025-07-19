@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -211,33 +210,21 @@ func ParseGPUsMetrics(logger log.Logger) (*GPUsMetrics, error) {
 	return &gm, nil
 }
 
-var executeCommand = Execute
-
 func AllocatedGPUsData(logger log.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,GresUsed:", "--state=allocated"}
-	return executeCommand(logger, "sinfo", args)
+	return Execute(logger, "sinfo", args)
 }
 
 func IdleGPUsData(logger log.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,Gres: ,GresUsed:", "--state=idle,allocated"}
-	return executeCommand(logger, "sinfo", args)
+	return Execute(logger, "sinfo", args)
 }
 
 func TotalGPUsData(logger log.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,Gres:"}
-	return executeCommand(logger, "sinfo", args)
+	return Execute(logger, "sinfo", args)
 }
 
-// Execute the sinfo command and return its output
-func Execute(logger log.Logger, command string, arguments []string) ([]byte, error) {
-	cmd := exec.Command(command, arguments...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to execute command", "command", command, "args", strings.Join(arguments, " "), "err", err)
-		return nil, err
-	}
-	return out, nil
-}
 
 /*
  * Implement the Prometheus Collector interface and feed the

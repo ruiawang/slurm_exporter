@@ -1,8 +1,6 @@
 package collector
 
 import (
-	"io"
-	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
@@ -135,69 +133,41 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 
 // Execute the sinfo command and return its output
 func NodesData(logger log.Logger, part string) ([]byte, error) {
-	cmd := exec.Command("sinfo", "-h", "-o %D|%T|%b", "-p", part, "| sort", "| uniq")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		level.Error(logger).Log("msg", "Failed to start command", "err", err)
-		return nil, err
-	}
-	out, _ := io.ReadAll(stdout)
-	if err := cmd.Wait(); err != nil {
-		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
-		return nil, err
-	}
-	return out, nil
+	return Execute(logger, "sinfo", []string{"-h", "-o", "%D|%T|%b", "-p", part})
 }
 
 func SlurmGetTotal(logger log.Logger) (float64, error) {
-	cmd := exec.Command("bash", "-c", "scontrol show nodes -o | grep -c NodeName=[a-z]*[0-9]*")
-	stdout, err := cmd.StdoutPipe()
+	out, err := Execute(logger, "scontrol", []string{"show", "nodes", "-o"})
 	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
 		return 0, err
 	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stderr pipe", "err", err)
-		return 0, err
+	// Filter out empty lines before counting
+	lines := strings.Split(string(out), "\n")
+	count := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
 	}
-	if err := cmd.Start(); err != nil {
-		level.Error(logger).Log("msg", "Failed to start command", "err", err)
-		return 0, err
-	}
-	out, _ := io.ReadAll(stdout)
-	err_out, _ := io.ReadAll(stderr)
-	if err := cmd.Wait(); err != nil {
-		level.Error(logger).Log("msg", "Failed to wait for command", "err", err, "stdout", string(out), "stderr", string(err_out))
-		return 0, err
-	}
-	data := strings.Split(string(out), "\n")
-	total, _ := strconv.ParseFloat(data[0], 64)
-	return total, nil
+	return float64(count), nil
 }
 
 func SlurmGetPartitions(logger log.Logger) ([]string, error) {
-	cmd := exec.Command("sinfo", "-h", "-o %R", "| sort", "| uniq")
-	stdout, err := cmd.StdoutPipe()
+	out, err := Execute(logger, "sinfo", []string{"-h", "-o", "%R"})
 	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		level.Error(logger).Log("msg", "Failed to start command", "err", err)
-		return nil, err
-	}
-	out, _ := io.ReadAll(stdout)
-	if err := cmd.Wait(); err != nil {
-		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
 		return nil, err
 	}
 	partitions := strings.Split(string(out), "\n")
-	return partitions, nil
+	// Trim whitespace and remove empty strings
+	var cleanedPartitions []string
+	for _, p := range partitions {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			cleanedPartitions = append(cleanedPartitions, p)
+		}
+	}
+	sort.Strings(cleanedPartitions)
+	return RemoveDuplicates(cleanedPartitions), nil
 }
 
 /*

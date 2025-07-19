@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -81,13 +80,8 @@ func ParseNodeMetrics(input []byte) map[string]*NodeMetrics {
 // NodeData executes the sinfo command to get data for each node
 // It returns the output of the sinfo command
 func NodeData(logger log.Logger) ([]byte, error) {
-	cmd := exec.Command("sinfo", "-h", "-N", "-O", "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition")
-	out, err := cmd.Output()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to execute sinfo command", "err", err)
-		return nil, err
-	}
-	return out, nil
+	args := []string{"-h", "-N", "-O", "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition"}
+	return Execute(logger, "sinfo", args)
 }
 
 type NodeCollector struct {

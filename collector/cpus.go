@@ -16,8 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package collector
 
 import (
-	"io"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -55,22 +53,7 @@ func ParseCPUsMetrics(input []byte) *CPUsMetrics {
 
 // Execute the sinfo command and return its output
 func CPUsData(logger log.Logger) ([]byte, error) {
-	cmd := exec.Command("sinfo", "-h", "-o %C")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		level.Error(logger).Log("msg", "Failed to start command", "err", err)
-		return nil, err
-	}
-	out, _ := io.ReadAll(stdout)
-	if err := cmd.Wait(); err != nil {
-		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
-		return nil, err
-	}
-	return out, nil
+	return Execute(logger, "sinfo", []string{"-h", "-o", "%C"})
 }
 
 /*

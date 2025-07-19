@@ -34,8 +34,10 @@ import (
 )
 
 var (
-	gpuAcct      = kingpin.Flag("gpus-acct", "Enable GPUs accounting").Default("false").Bool()
-	toolkitFlags = webflag.AddFlags(kingpin.CommandLine, ":8080")
+	gpuAcct        = kingpin.Flag("gpus-acct", "Enable GPUs accounting").Default("false").Bool()
+	commandTimeout = kingpin.Flag("command.timeout", "Timeout for executing Slurm commands.").Default("5s").Duration()
+	logLevel       = kingpin.Flag("log.level", "Only log messages with the given severity or above. One of: [debug, info, warn, error]").Default("info").Enum("debug", "info", "warn", "error")
+	toolkitFlags   = webflag.AddFlags(kingpin.CommandLine, ":8080")
 )
 
 // Message to display on the root page
@@ -79,7 +81,17 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
+	// Setup logger with the configured level
+	promlogConfig.Level = &promlog.AllowedLevel{}
+	err := promlogConfig.Level.Set(*logLevel)
+	if err != nil {
+		// This should not happen due to kingpin's Enum validation
+		panic(err)
+	}
 	logger := promlog.New(promlogConfig)
+
+	// Set the command timeout for the collector package.
+	collector.SetCommandTimeout(*commandTimeout)
 
 	// Register version metrics
 	prometheus.MustRegister(collectors.NewBuildInfoCollector())
@@ -89,6 +101,7 @@ func main() {
 
 	// Log server startup details
 	level.Info(logger).Log("msg", "Starting Server with GPUs Accounting", "enabled", *gpuAcct)
+	level.Info(logger).Log("msg", "Command timeout set", "timeout", *commandTimeout)
 
 	// Define the root handler for '/'
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -61,14 +61,14 @@ func TestGPUsMetrics(t *testing.T) {
 }
 
 func TestGPUsGetMetrics(t *testing.T) {
-	oldExecuteCommand := executeCommand
-	defer func() { executeCommand = oldExecuteCommand }()
+	oldExecute := Execute
+	defer func() { Execute = oldExecute }()
 
 	test_data_paths, _ := filepath.Glob("../test_data/slurm-*")
 	for _, test_data_path := range test_data_paths {
 		slurm_version := strings.TrimPrefix(test_data_path, "../test_data/slurm-")
 		t.Run(slurm_version, func(t *testing.T) {
-			executeCommand = func(logger log.Logger, command string, arguments []string) ([]byte, error) {
+			Execute = func(logger log.Logger, command string, arguments []string) ([]byte, error) {
 				var file string
 				if strings.Contains(arguments[2], "GresUsed:") && strings.Contains(arguments[2], "Gres:") {
 					file = filepath.Join(test_data_path, "sinfo_gpus_idle.txt")

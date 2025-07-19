@@ -1,8 +1,6 @@
 package collector
 
 import (
-	"io"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -42,22 +40,7 @@ type SchedulerMetrics struct {
 
 // Execute the sdiag command and return its output
 func SchedulerData(logger log.Logger) ([]byte, error) {
-	cmd := exec.Command("/usr/bin/sdiag")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create stdout pipe", "err", err)
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		level.Error(logger).Log("msg", "Failed to start command", "err", err)
-		return nil, err
-	}
-	out, _ := io.ReadAll(stdout)
-	if err := cmd.Wait(); err != nil {
-		level.Error(logger).Log("msg", "Failed to wait for command", "err", err)
-		return nil, err
-	}
-	return out, nil
+	return Execute(logger, "sdiag", nil)
 }
 
 // Extract the relevant metrics from the sdiag output
