@@ -71,7 +71,7 @@ go/modules/pkg/mod: go.mod
 .PHONY: test
 test: go/modules/pkg/mod $(GOFILES)
 	@echo "Running tests"
-	go test -v
+	go test -v ./...
 
 # Run the built binary
 .PHONY: run
