@@ -93,27 +93,54 @@ func ParseIdleGPUs(data []byte) float64 {
 		for _, line := range strings.Split(sinfo_lines, "\n") {
 			// log.info(line)
 			if len(line) > 0 && strings.Contains(line, "gpu:") {
-				nodes := strings.Fields(line)[0]
+				fields := strings.Fields(line)
+				nodes := fields[0]
 				num_nodes, _ := strconv.ParseFloat(nodes, 64)
-				node_gpus := strings.Fields(line)[1]
-				num_node_gpus := 0.0
-				for _, node_gpus_type := range strings.Split(node_gpus, ",") {
-					if strings.Contains(node_gpus_type, "gpu:") {
-						node_gpus_type = re.FindStringSubmatch(node_gpus_type)[2]
-						num_node_gpus_type, _ := strconv.ParseFloat(node_gpus_type, 64)
-						num_node_gpus += num_node_gpus_type
+
+				if len(fields) == 1 {
+					// Case where only one column is present, assume it's allocated GPUs
+					num_gpus += 0 // No idle GPUs in this case
+				} else if len(fields) == 2 {
+					// Case where two columns are present
+					node_gpus_str := fields[1]
+					num_node_gpus := 0.0
+					for _, node_gpus_type := range strings.Split(node_gpus_str, ",") {
+						if strings.Contains(node_gpus_type, "gpu:") {
+							submatch := re.FindStringSubmatch(node_gpus_type)
+							if len(submatch) > 2 {
+								gpu_count, _ := strconv.ParseFloat(submatch[2], 64)
+								num_node_gpus += gpu_count
+							}
+						}
 					}
-				}
-				num_node_active_gpus := 0.0
-				node_active_gpus := strings.Fields(line)[2]
-				for _, node_active_gpus_type := range strings.Split(node_active_gpus, ",") {
-					if strings.Contains(node_active_gpus_type, "gpu:") {
-						node_active_gpus_type = re.FindStringSubmatch(node_active_gpus_type)[2]
-						num_node_active_gpus_type, _ := strconv.ParseFloat(node_active_gpus_type, 64)
-						num_node_active_gpus += num_node_active_gpus_type
+					num_gpus += num_nodes * num_node_gpus
+				} else if len(fields) >= 3 {
+					// Original case with three or more columns
+					node_gpus_str := fields[1]
+					num_node_gpus := 0.0
+					for _, node_gpus_type := range strings.Split(node_gpus_str, ",") {
+						if strings.Contains(node_gpus_type, "gpu:") {
+							submatch := re.FindStringSubmatch(node_gpus_type)
+							if len(submatch) > 2 {
+								gpu_count, _ := strconv.ParseFloat(submatch[2], 64)
+								num_node_gpus += gpu_count
+							}
+						}
 					}
+
+					active_gpus_str := fields[2]
+					num_node_active_gpus := 0.0
+					for _, node_active_gpus_type := range strings.Split(active_gpus_str, ",") {
+						if strings.Contains(node_active_gpus_type, "gpu:") {
+							submatch := re.FindStringSubmatch(node_active_gpus_type)
+							if len(submatch) > 2 {
+								gpu_count, _ := strconv.ParseFloat(submatch[2], 64)
+								num_node_active_gpus += gpu_count
+							}
+						}
+					}
+					num_gpus += num_nodes * (num_node_gpus - num_node_active_gpus)
 				}
-				num_gpus += num_nodes * (num_node_gpus - num_node_active_gpus)
 			}
 		}
 	}
@@ -184,19 +211,21 @@ func ParseGPUsMetrics(logger log.Logger) (*GPUsMetrics, error) {
 	return &gm, nil
 }
 
+var executeCommand = Execute
+
 func AllocatedGPUsData(logger log.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,GresUsed:", "--state=allocated"}
-	return Execute(logger, "sinfo", args)
+	return executeCommand(logger, "sinfo", args)
 }
 
 func IdleGPUsData(logger log.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,Gres: ,GresUsed:", "--state=idle,allocated"}
-	return Execute(logger, "sinfo", args)
+	return executeCommand(logger, "sinfo", args)
 }
 
 func TotalGPUsData(logger log.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,Gres:"}
-	return Execute(logger, "sinfo", args)
+	return executeCommand(logger, "sinfo", args)
 }
 
 // Execute the sinfo command and return its output

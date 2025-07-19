@@ -23,7 +23,7 @@ import (
 
 func TestParseQueueMetrics(t *testing.T) {
 	// Read the input data from a file
-	file, err := os.Open("test_data/squeue.txt")
+	file, err := os.Open("../test_data/squeue.txt")
 	if err != nil {
 		t.Fatalf("Can not open test data: %v", err)
 	}

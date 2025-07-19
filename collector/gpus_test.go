@@ -21,12 +21,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-kit/log"
 )
 
 func TestGPUsMetrics(t *testing.T) {
-	test_data_paths, _ := filepath.Glob("test_data/slurm-*")
+	test_data_paths, _ := filepath.Glob("../test_data/slurm-*")
 	for _, test_data_path := range test_data_paths {
-		slurm_version := strings.TrimPrefix(test_data_path, "test_data/slurm-")
+		slurm_version := strings.TrimPrefix(test_data_path, "../test_data/slurm-")
 		t.Logf("slurm-%s", slurm_version)
 
 		// Read the input data from a file
@@ -59,5 +61,36 @@ func TestGPUsMetrics(t *testing.T) {
 }
 
 func TestGPUsGetMetrics(t *testing.T) {
-	t.Logf("%+v", GPUsGetMetrics())
+	oldExecuteCommand := executeCommand
+	defer func() { executeCommand = oldExecuteCommand }()
+
+	test_data_paths, _ := filepath.Glob("../test_data/slurm-*")
+	for _, test_data_path := range test_data_paths {
+		slurm_version := strings.TrimPrefix(test_data_path, "../test_data/slurm-")
+		t.Run(slurm_version, func(t *testing.T) {
+			executeCommand = func(logger log.Logger, command string, arguments []string) ([]byte, error) {
+				var file string
+				if strings.Contains(arguments[2], "GresUsed:") && strings.Contains(arguments[2], "Gres:") {
+					file = filepath.Join(test_data_path, "sinfo_gpus_idle.txt")
+				} else if strings.Contains(arguments[2], "GresUsed:") {
+					file = filepath.Join(test_data_path, "sinfo_gpus_allocated.txt")
+				} else if strings.Contains(arguments[2], "Gres:") {
+					file = filepath.Join(test_data_path, "sinfo_gpus_total.txt")
+				}
+				data, err := os.ReadFile(file)
+				if err != nil {
+					return nil, err
+				}
+				return data, nil
+			}
+
+			logger := log.NewNopLogger()
+			metrics, err := GPUsGetMetrics(logger)
+			if err != nil {
+				t.Fatalf("GPUsGetMetrics() error: %v", err)
+			}
+			t.Logf("slurm-%s: %+v", slurm_version, metrics)
+		})
+	}
 }
+
