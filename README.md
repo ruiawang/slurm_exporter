@@ -1,5 +1,3 @@
-[![Buy Me a Coffee](https://storage.ko-fi.com/cdn/kofi2.png?v=3)](https://ko-fi.com/C0C514I8WG)
-
 # Prometheus Slurm Exporter
 
 Prometheus collector and exporter for metrics extracted from the [Slurm](https://slurm.schedmd.com/overview.html) resource scheduling system.
@@ -25,6 +23,7 @@ Prometheus collector and exporter for metrics extracted from the [Slurm](https:/
   - [Prometheus Configuration](#prometheus-configuration)
   - [Grafana Dashboard](#grafana-dashboard)
   - [License](#license)
+  - [About this fork](#about-this-fork)
 
 ---
 
@@ -221,3 +220,13 @@ A [Grafana dashboard](https://grafana.com/dashboards/4323) is available:
 
 This project is licensed under the GNU General Public License, version 3 or later.
 
+[![Buy Me a Coffee](https://storage.ko-fi.com/cdn/kofi6.png?v=6)](https://ko-fi.com/C0C514I8WG)
+
+---
+
+## About this fork
+
+This project is a **fork** of [cea-hpc/slurm_exporter](https://github.com/cea-hpc/slurm_exporter),  
+which itself is a fork of [vpenso/prometheus-slurm-exporter](https://github.com/vpenso/prometheus-slurm-exporter) (now apparently unmaintained).
+
+Feel free to contribute or open issues!
