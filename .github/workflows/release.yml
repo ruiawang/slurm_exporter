@@ -81,7 +81,7 @@ jobs:
     permissions:
       id-token: write # To sign the provenance.
       contents: write # To add assets to a release.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_goreleaser_slsa3.yml@v2.0.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/goreleaser.yml@v2.0.0
     with:
       goreleaser-config: .goreleaser.yaml
       # We can't use ${{ needs.release.outputs.artifacts }} because it's empty on skipped jobs
@@ -94,14 +94,14 @@ jobs:
       # You can get the list of artifacts from the GoReleaser output,
       # or from the summary of a successful release run.
       assets: |
-        slurm_exporter_linux_amd64.tar.gz
-        slurm_exporter_linux_arm64.tar.gz
-        slurm_exporter_linux_386.tar.gz
-        slurm_exporter_darwin_amd64.tar.gz
-        slurm_exporter_darwin_arm64.tar.gz
-        slurm_exporter_windows_amd64.zip
-        slurm_exporter_windows_arm64.zip
-        slurm_exporter_windows_386.zip
+        slurm_exporter-${{ github.ref_name }}-linux-amd64.tar.gz
+        slurm_exporter-${{ github.ref_name }}-linux-arm64.tar.gz
+        slurm_exporter-${{ github.ref_name }}-linux-386.tar.gz
+        slurm_exporter-${{ github.ref_name }}-darwin-amd64.tar.gz
+        slurm_exporter-${{ github.ref_name }}-darwin-arm64.tar.gz
+        slurm_exporter-${{ github.ref_name }}-windows-amd64.zip
+        slurm_exporter-${{ github.ref_name }}-windows-arm64.zip
+        slurm_exporter-${{ github.ref_name }}-windows-386.zip
       # The GoReleaser-generated checksum file.
       # This is a hard requirement of the slsa-github-generator.
       checksum-file-name: 'slurm_exporter_checksums.txt'
