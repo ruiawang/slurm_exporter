@@ -38,7 +38,7 @@ This release marks a major milestone, signifying a stable and feature-rich versi
 ### ⚙️ CI/CD
 
 - **Major Overhaul:** The entire release process has been modernized. It now uses the latest versions of `goreleaser` and `golangci-lint`, and the GitHub Actions workflows have been simplified and made more reliable.
-- **SLSA Provenance:** The release process now generates SLSA provenance to verify the integrity of the build artifacts.
+
 - **Snapshot Builds:** The CI/CD pipeline can now produce development "snapshot" builds for testing purposes.
 - **Packaging:** Removed unsupported packaging formats (RPM, Snap) to focus on robust binary releases.
 
