@@ -34,11 +34,29 @@ import (
 )
 
 var (
-	gpuAcct        = kingpin.Flag("gpus-acct", "Enable GPUs accounting").Default("false").Bool()
+	// Flags for command-line configuration
 	commandTimeout = kingpin.Flag("command.timeout", "Timeout for executing Slurm commands.").Default("5s").Duration()
 	logLevel       = kingpin.Flag("log.level", "Only log messages with the given severity or above. One of: [debug, info, warn, error]").Default("info").Enum("debug", "info", "warn", "error")
 	toolkitFlags   = webflag.AddFlags(kingpin.CommandLine, ":8080")
+
+	// Map to store the state of collectors
+	collectorState = make(map[string]*bool)
 )
+
+// Map of collector constructors
+var collectorConstructors = map[string]func(logger log.Logger) prometheus.Collector{
+	"accounts":   func(l log.Logger) prometheus.Collector { return collector.NewAccountsCollector(l) },
+	"cpus":       func(l log.Logger) prometheus.Collector { return collector.NewCPUsCollector(l) },
+	"nodes":      func(l log.Logger) prometheus.Collector { return collector.NewNodesCollector(l) },
+	"node":       func(l log.Logger) prometheus.Collector { return collector.NewNodeCollector(l) },
+	"partitions": func(l log.Logger) prometheus.Collector { return collector.NewPartitionsCollector(l) },
+	"queue":      func(l log.Logger) prometheus.Collector { return collector.NewQueueCollector(l) },
+	"scheduler":  func(l log.Logger) prometheus.Collector { return collector.NewSchedulerCollector(l) },
+	"fairshare":  func(l log.Logger) prometheus.Collector { return collector.NewFairShareCollector(l) },
+	"users":      func(l log.Logger) prometheus.Collector { return collector.NewUsersCollector(l) },
+	"info":       func(l log.Logger) prometheus.Collector { return collector.NewSlurmInfoCollector(l) },
+	"gpus":       func(l log.Logger) prometheus.Collector { return collector.NewGPUsCollector(l) },
+}
 
 // Message to display on the root page
 const indexHTML = `<html>
@@ -49,32 +67,23 @@ const indexHTML = `<html>
 	</body>
 </html>`
 
-func registerCollectors(logger log.Logger, gpuAcct bool) {
-	collectors := []prometheus.Collector{
-		collector.NewAccountsCollector(logger),
-		collector.NewCPUsCollector(logger),
-		collector.NewNodesCollector(logger),
-		collector.NewNodeCollector(logger),
-		collector.NewPartitionsCollector(logger),
-		collector.NewQueueCollector(logger),
-		collector.NewSchedulerCollector(logger),
-		collector.NewFairShareCollector(logger),
-		collector.NewUsersCollector(logger),
-		collector.NewSlurmInfoCollector(logger),
-	}
-
-	// Register GPU collector if enabled
-	if gpuAcct {
-		collectors = append(collectors, collector.NewGPUsCollector(logger))
-	}
-
-	// Register all collectors
-	for _, collector := range collectors {
-		prometheus.MustRegister(collector)
+func registerCollectors(logger log.Logger) {
+	for name, constructor := range collectorConstructors {
+		if *collectorState[name] {
+			prometheus.MustRegister(constructor(logger))
+			level.Info(logger).Log("msg", "Collector enabled", "collector", name)
+		} else {
+			level.Info(logger).Log("msg", "Collector disabled", "collector", name)
+		}
 	}
 }
 
 func main() {
+	// Dynamically create flags for each collector
+	for name := range collectorConstructors {
+		collectorState[name] = kingpin.Flag("collector."+name, "Enable the "+name+" collector.").Default("true").Bool()
+	}
+
 	// Prometheus logging configuration
 	promlogConfig := &promlog.Config{}
 	kingpin.Version(version.Print("slurm_exporter"))
@@ -83,10 +92,8 @@ func main() {
 
 	// Setup logger with the configured level
 	promlogConfig.Level = &promlog.AllowedLevel{}
-	err := promlogConfig.Level.Set(*logLevel)
-	if err != nil {
-		// This should not happen due to kingpin's Enum validation
-		panic(err)
+	if err := promlogConfig.Level.Set(*logLevel); err != nil {
+		panic(err) // Should not happen due to kingpin's Enum validation
 	}
 	logger := promlog.New(promlogConfig)
 
@@ -96,11 +103,11 @@ func main() {
 	// Register version metrics
 	prometheus.MustRegister(collectors.NewBuildInfoCollector())
 
-	// Register collectors based on the GPU accounting flag
-	registerCollectors(logger, *gpuAcct)
+	// Register collectors based on flags
+	registerCollectors(logger)
 
 	// Log server startup details
-	level.Info(logger).Log("msg", "Starting Server with GPUs Accounting", "enabled", *gpuAcct)
+	level.Info(logger).Log("msg", "Starting Server...")
 	level.Info(logger).Log("msg", "Command timeout set", "timeout", *commandTimeout)
 
 	// Define the root handler for '/'
