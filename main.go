@@ -56,6 +56,7 @@ var collectorConstructors = map[string]func(logger log.Logger) prometheus.Collec
 	"users":      func(l log.Logger) prometheus.Collector { return collector.NewUsersCollector(l) },
 	"info":       func(l log.Logger) prometheus.Collector { return collector.NewSlurmInfoCollector(l) },
 	"gpus":       func(l log.Logger) prometheus.Collector { return collector.NewGPUsCollector(l) },
+	"reservations": func(l log.Logger) prometheus.Collector { return collector.NewReservationsCollector(l) },
 }
 
 // Message to display on the root page
