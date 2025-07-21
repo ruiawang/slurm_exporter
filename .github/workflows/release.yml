@@ -49,6 +49,10 @@ jobs:
         with:
           go-version: '1.22'
           cache: true
+      - name: Set build environment variables
+        run: |
+          echo "BUILD_DATE=$(date +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+          echo "GO_VERSION=$(go version)" >> $GITHUB_ENV
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -58,6 +62,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          BUILD_USER: "${{ github.actor }}"
+          BUILD_DATE: ${{ env.BUILD_DATE }}
+          GO_VERSION: ${{ env.GO_VERSION }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          REVISION: ${{ github.sha }}
 
   slsa-goreleaser:
     needs: release
