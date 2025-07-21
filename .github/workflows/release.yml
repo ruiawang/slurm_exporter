@@ -53,6 +53,14 @@ jobs:
         run: |
           echo "BUILD_DATE=$(date +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
           echo "GO_VERSION=$(go version)" >> $GITHUB_ENV
+      - name: Debug Git State
+        run: |
+          echo "Current commit:"
+          git log -n 1
+          echo "All tags:"
+          git tag -l
+          echo "HEAD commit hash:"
+          git rev-parse HEAD
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
