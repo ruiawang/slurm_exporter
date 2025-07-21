@@ -37,7 +37,7 @@ type QueueMetrics struct {
 	c_node_fail   NVal
 }
 
-// Returns the scheduler metrics
+
 func QueueGetMetrics(logger log.Logger) (*QueueMetrics, error) {
 	data, err := QueueData(logger)
 	if err != nil {
@@ -70,6 +70,10 @@ func (s *NNVal) Incr2(reason string, user string, part string, count float64) {
 	child2[part] += count
 }
 
+/*
+ParseQueueMetrics parses the output of the squeue command for queue metrics.
+Expected input format: "%P,%T,%C,%r,%u" (Partition,State,CPUs,Reason,User).
+*/
 func ParseQueueMetrics(input []byte) *QueueMetrics {
 	qm := QueueMetrics{
 		pending:       make(NNVal),
@@ -146,7 +150,11 @@ func ParseQueueMetrics(input []byte) *QueueMetrics {
 	return &qm
 }
 
-// Execute the squeue command and return its output
+
+/*
+QueueData executes the squeue command to retrieve queue information.
+Expected squeue output format: "%P,%T,%C,%r,%u" (Partition,State,CPUs,Reason,User).
+*/
 func QueueData(logger log.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-h", "-o", "%P,%T,%C,%r,%u"})
 }

@@ -1,18 +1,3 @@
-/* Copyright 2020 Victor Penso
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
 package collector
 
 import (
@@ -25,6 +10,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+/*
+AccountsData executes the squeue command to retrieve job information by account.
+Expected squeue output format: "%A|%a|%T|%C" (Job ID|Account|State|CPUs).
+*/
 func AccountsData(logger log.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%A|%a|%T|%C"})
 }
@@ -36,6 +25,10 @@ type JobMetrics struct {
 	suspended    float64
 }
 
+/*
+ParseAccountsMetrics parses the output of the squeue command for account-specific job metrics.
+It expects input in the format: "JobID|Account|State|CPUs".
+*/
 func ParseAccountsMetrics(input []byte) map[string]*JobMetrics {
 	accounts := make(map[string]*JobMetrics)
 	lines := strings.Split(string(input), "\n")

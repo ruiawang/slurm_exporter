@@ -38,12 +38,20 @@ type SchedulerMetrics struct {
 	user_rpc_stats_total_time         map[string]float64
 }
 
-// Execute the sdiag command and return its output
+
+/*
+SchedulerData executes the sdiag command to retrieve scheduler statistics.
+Expected sdiag output format: various key:value pairs and RPC statistics sections.
+*/
 func SchedulerData(logger log.Logger) ([]byte, error) {
 	return Execute(logger, "sdiag", nil)
 }
 
-// Extract the relevant metrics from the sdiag output
+
+/*
+ParseSchedulerMetrics parses the output of the sdiag command.
+It extracts various scheduler metrics, handling specific repetitions for 'Last cycle' and 'Mean cycle'.
+*/
 func ParseSchedulerMetrics(input []byte) *SchedulerMetrics {
 	var sm SchedulerMetrics
 	lines := strings.Split(string(input), "\n")
@@ -110,7 +118,11 @@ func ParseSchedulerMetrics(input []byte) *SchedulerMetrics {
 	return &sm
 }
 
-// Helper function to split a single line from the sdiag output
+
+/*
+SplitColonValueToFloat extracts a float64 value from a string in "key: value" format.
+Returns 0 if the format is not as expected.
+*/
 func SplitColonValueToFloat(input string) float64 {
 	str := strings.Split(input, ":")
 	if len(str) == 1 {
@@ -122,7 +134,11 @@ func SplitColonValueToFloat(input string) float64 {
 	}
 }
 
-// Helper function to return RPC stats from sdiag output
+
+/*
+ParseRpcStats parses the RPC statistics sections from sdiag output.
+It identifies and extracts RPC counts, average times, and total times for both message types and users.
+*/
 func ParseRpcStats(lines []string) []map[string]float64 {
 	var in_rpc bool
 	var in_rpc_per_user bool
@@ -181,7 +197,7 @@ func ParseRpcStats(lines []string) []map[string]float64 {
 	return rpc_stats_final
 }
 
-// Returns the scheduler metrics
+
 func SchedulerGetMetrics(logger log.Logger) (*SchedulerMetrics, error) {
 	data, err := SchedulerData(logger)
 	if err != nil {
@@ -196,7 +212,7 @@ func SchedulerGetMetrics(logger log.Logger) (*SchedulerMetrics, error) {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 
-// Collector strcture
+
 type SchedulerCollector struct {
 	threads                           *prometheus.Desc
 	queue_size                        *prometheus.Desc
@@ -219,7 +235,7 @@ type SchedulerCollector struct {
 	logger                            log.Logger
 }
 
-// Send all metric descriptions
+
 func (c *SchedulerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.threads
 	ch <- c.queue_size
@@ -241,7 +257,7 @@ func (c *SchedulerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.user_rpc_stats_total_time
 }
 
-// Send the values of all metrics
+
 func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
 	sm, err := SchedulerGetMetrics(sc.logger)
 	if err != nil {
@@ -281,7 +297,7 @@ func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
 
 }
 
-// Returns the Slurm scheduler collector, used to register with the prometheus client
+
 func NewSchedulerCollector(logger log.Logger) *SchedulerCollector {
 	rpc_stats_labels := make([]string, 0, 1)
 	rpc_stats_labels = append(rpc_stats_labels, "operation")

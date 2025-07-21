@@ -14,7 +14,7 @@ type SlurmInfoCollector struct {
 	logger    log.Logger
 }
 
-// NewSlurmInfoCollector initializes a new SlurmInfoCollector
+
 func NewSlurmInfoCollector(logger log.Logger) *SlurmInfoCollector {
 	binaries := []string{
 		"sinfo", "squeue", "sdiag", "scontrol",
@@ -28,23 +28,23 @@ func NewSlurmInfoCollector(logger log.Logger) *SlurmInfoCollector {
 	}
 }
 
-// Describe sends the metric descriptions to Prometheus
+
 func (c *SlurmInfoCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.slurmInfo
 }
 
-// Collect gathers the Slurm information and sends it as a metric to Prometheus
+
 func (c *SlurmInfoCollector) Collect(ch chan<- prometheus.Metric) {
-	// Get the general Slurm version
+	
 	version, found := GetBinaryVersion(c.logger, "sinfo")
 	versionValue := 0.0
 	if found {
 		versionValue = 1.0
 	}
-	// Send the general Slurm version as a metric
+	
 	ch <- prometheus.MustNewConstMetric(c.slurmInfo, prometheus.GaugeValue, versionValue, "general", "", version)
 
-	// Check each binary and send their availability and version
+	
 	for _, binary := range c.binaries {
 		binVersion, binFound := GetBinaryVersion(c.logger, binary)
 		binValue := 0.0
@@ -55,7 +55,7 @@ func (c *SlurmInfoCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// getBinaryVersion checks if a Slurm binary is installed and returns its version string
+
 func GetBinaryVersion(logger log.Logger, binary string) (string, bool) {
 	output, err := Execute(logger, binary, []string{"--version"})
 	if err != nil {

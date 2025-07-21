@@ -10,6 +10,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+/*
+UsersData executes the squeue command to retrieve job information by user.
+Expected squeue output format: "%A|%u|%T|%C" (Job ID|User|State|CPUs).
+*/
 func UsersData(logger log.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%A|%u|%T|%C"})
 }
@@ -21,6 +25,10 @@ type UserJobMetrics struct {
 	suspended    float64
 }
 
+/*
+ParseUsersMetrics parses the output of the squeue command for user-specific job metrics.
+It expects input in the format: "JobID|User|State|CPUs".
+*/
 func ParseUsersMetrics(logger log.Logger) (map[string]*UserJobMetrics, error) {
 	users := make(map[string]*UserJobMetrics)
 	usersData, err := UsersData(logger)

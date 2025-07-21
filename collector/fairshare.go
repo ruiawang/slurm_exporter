@@ -9,6 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+/*
+FairShareData executes the sshare command to retrieve fairshare information.
+Expected sshare output format: "account,fairshare".
+*/
 func FairShareData(logger log.Logger) ([]byte, error) {
 	return Execute(logger, "sshare", []string{"-n", "-P", "-o", "account,fairshare"})
 }
@@ -17,6 +21,10 @@ type FairShareMetrics struct {
 	fairshare float64
 }
 
+/*
+ParseFairShareMetrics parses the output of the sshare command for fairshare metrics.
+It expects input in the format: "account|fairshare".
+*/
 func ParseFairShareMetrics(logger log.Logger) (map[string]*FairShareMetrics, error) {
 	accounts := make(map[string]*FairShareMetrics)
 	fairShareData, err := FairShareData(logger)

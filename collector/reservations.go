@@ -40,7 +40,7 @@ type ReservationsCollector struct {
 	coreCount *prometheus.Desc
 }
 
-// NewReservationsCollector returns a new ReservationsCollector.
+
 func NewReservationsCollector(logger log.Logger) *ReservationsCollector {
 	labels := []string{"reservation_name", "state", "users", "nodes", "partition", "flags"}
 	return &ReservationsCollector{
@@ -107,10 +107,18 @@ func (c *ReservationsCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+/*
+reservationsData executes the scontrol command to retrieve reservation information.
+Expected scontrol output format: key=value pairs for each reservation, separated by blank lines.
+*/
 func (c *ReservationsCollector) reservationsData() ([]byte, error) {
 	return Execute(c.logger, "scontrol", []string{"show", "reservation"})
 }
 
+/*
+parseReservations parses the output of the scontrol show reservation command.
+It expects input as a series of key=value pairs for each reservation, separated by blank lines.
+*/
 func parseReservations(data []byte) ([]ReservationInfo, error) {
 	var reservations []ReservationInfo
 	// Slurm output is a set of records separated by a blank line.

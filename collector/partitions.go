@@ -9,10 +9,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+/*
+PartitionsData executes the sinfo command to retrieve partition CPU information.
+Expected sinfo output format: "%R,%C" (PartitionName,Alloc/Idle/Other/Total CPUs).
+*/
 func PartitionsData(logger log.Logger) ([]byte, error) {
 	return Execute(logger, "sinfo", []string{"-h", "-o", "%R,%C"})
 }
 
+/*
+PartitionsPendingJobsData executes the squeue command to retrieve pending job counts per partition.
+Expected squeue output format: "%P" (PartitionName).
+*/
 func PartitionsPendingJobsData(logger log.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%P", "--states=PENDING"})
 }
@@ -25,6 +33,10 @@ type PartitionMetrics struct {
 	total     float64
 }
 
+/*
+ParsePartitionsMetrics parses the output of sinfo and squeue for partition metrics.
+It combines CPU allocation data from sinfo ("%R,%C") with pending job counts from squeue ("%P").
+*/
 func ParsePartitionsMetrics(logger log.Logger) (map[string]*PartitionMetrics, error) {
 	partitions := make(map[string]*PartitionMetrics)
 	partitionsData, err := PartitionsData(logger)
@@ -34,7 +46,7 @@ func ParsePartitionsMetrics(logger log.Logger) (map[string]*PartitionMetrics, er
 	lines := strings.Split(string(partitionsData), "\n")
 	for _, line := range lines {
 		if strings.Contains(line, ",") {
-			// name of a partition
+			
 			partition := strings.Split(line, ",")[0]
 			_, key := partitions[partition]
 			if !key {
@@ -51,14 +63,14 @@ func ParsePartitionsMetrics(logger log.Logger) (map[string]*PartitionMetrics, er
 			partitions[partition].total = total
 		}
 	}
-	// get list of pending jobs by partition name
+	
 	pendingJobsData, err := PartitionsPendingJobsData(logger)
 	if err != nil {
 		return nil, err
 	}
 	list := strings.Split(string(pendingJobsData), "\n")
 	for _, partition := range list {
-		// accumulate the number of pending jobs
+		
 		_, key := partitions[partition]
 		if key {
 			partitions[partition].pending += 1

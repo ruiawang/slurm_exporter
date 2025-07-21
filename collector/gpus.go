@@ -22,30 +22,7 @@ func GPUsGetMetrics(logger log.Logger) (*GPUsMetrics, error) {
 	return ParseGPUsMetrics(logger)
 }
 
-/* TODO:
-  sinfo has gresUSED since slurm>=19.05.0rc01 https://github.com/SchedMD/slurm/blob/master/NEWS
-  revert to old process on slurm<19.05.0rc01
-  --format=AllocGRES will return gres/gpu=8
-  --format=AllocTRES will return billing=16,cpu=16,gres/gpu=8,mem=256G,node=1
-func ParseAllocatedGPUs() float64 {
-	var num_gpus = 0.0
 
-	args := []string{"-a", "-X", "--format=Allocgres", "--state=RUNNING", "--noheader", "--parsable2"}
-	output := string(Execute("sacct", args))
-	if len(output) > 0 {
-		for _, line := range strings.Split(output, "\n") {
-			if len(line) > 0 {
-				line = strings.Trim(line, "\"")
-				descriptor := strings.TrimPrefix(line, "gpu:")
-				job_gpus, _ := strconv.ParseFloat(descriptor, 64)
-				num_gpus += job_gpus
-			}
-		}
-	}
-
-	return num_gpus
-}
-*/
 
 func ParseAllocatedGPUs(data []byte) float64 {
 	var num_gpus = 0.0
@@ -58,7 +35,7 @@ func ParseAllocatedGPUs(data []byte) float64 {
 	re := regexp.MustCompile(`gpu:(\(null\)|[^:(]*):?([0-9]+)(\([^)]*\))?`)
 	if len(sinfo_lines) > 0 {
 		for _, line := range strings.Split(sinfo_lines, "\n") {
-			// log.info(line)
+
 			if len(line) > 0 && strings.Contains(line, "gpu:") {
 				nodes := strings.Fields(line)[0]
 				num_nodes, _ := strconv.ParseFloat(nodes, 64)
@@ -90,7 +67,7 @@ func ParseIdleGPUs(data []byte) float64 {
 	re := regexp.MustCompile(`gpu:(\(null\)|[^:(]*):?([0-9]+)(\([^)]*\))?`)
 	if len(sinfo_lines) > 0 {
 		for _, line := range strings.Split(sinfo_lines, "\n") {
-			// log.info(line)
+
 			if len(line) > 0 && strings.Contains(line, "gpu:") {
 				fields := strings.Fields(line)
 				nodes := fields[0]
@@ -158,7 +135,7 @@ func ParseTotalGPUs(data []byte) float64 {
 	re := regexp.MustCompile(`gpu:(\(null\)|[^:(]*):?([0-9]+)(\([^)]*\))?`)
 	if len(sinfo_lines) > 0 {
 		for _, line := range strings.Split(sinfo_lines, "\n") {
-			// log.Info(line)
+			
 			if len(line) > 0 && strings.Contains(line, "gpu:") {
 				nodes := strings.Fields(line)[0]
 				num_nodes, _ := strconv.ParseFloat(nodes, 64)
@@ -252,7 +229,7 @@ type GPUsCollector struct {
 	logger      log.Logger
 }
 
-// Send all metric descriptions
+
 func (cc *GPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- cc.alloc
 	ch <- cc.idle

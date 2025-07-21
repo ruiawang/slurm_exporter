@@ -1,18 +1,3 @@
-/* Copyright 2017 Victor Penso, Matteo Dessalvi
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
 package collector
 
 import (
@@ -39,6 +24,10 @@ func CPUsGetMetrics(logger log.Logger) (*CPUsMetrics, error) {
 	return ParseCPUsMetrics(data), nil
 }
 
+/*
+ParseCPUsMetrics parses the output of the sinfo command for CPU metrics.
+Expected input format: "allocated/idle/other/total".
+*/
 func ParseCPUsMetrics(input []byte) *CPUsMetrics {
 	var cm CPUsMetrics
 	if strings.Contains(string(input), "/") {
@@ -51,7 +40,11 @@ func ParseCPUsMetrics(input []byte) *CPUsMetrics {
 	return &cm
 }
 
-// Execute the sinfo command and return its output
+
+/*
+CPUsData executes the sinfo command to retrieve CPU information.
+Expected sinfo output format: "%C" (allocated/idle/other/total CPUs).
+*/
 func CPUsData(logger log.Logger) ([]byte, error) {
 	return Execute(logger, "sinfo", []string{"-h", "-o", "%C"})
 }
@@ -80,7 +73,7 @@ type CPUsCollector struct {
 	logger log.Logger
 }
 
-// Send all metric descriptions
+
 func (cc *CPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- cc.alloc
 	ch <- cc.idle

@@ -43,6 +43,10 @@ func InitFeatureSet(nm *NodesMetrics, feature_set string) {
 	// The linter correctly identified self-assignments here.
 }
 
+/*
+ParseNodesMetrics parses the output of the sinfo command for node metrics.
+Expected input format: "%D|%T|%b" (Nodes|State|Features).
+*/
 func ParseNodesMetrics(input []byte) *NodesMetrics {
 	var nm NodesMetrics
 	var feature_set string
@@ -120,11 +124,19 @@ func ParseNodesMetrics(input []byte) *NodesMetrics {
 	return &nm
 }
 
-// Execute the sinfo command and return its output
+
+/*
+NodesData executes the sinfo command to retrieve node information.
+Expected sinfo output format: "%D|%T|%b" (Nodes|State|Features).
+*/
 func NodesData(logger log.Logger, part string) ([]byte, error) {
 	return Execute(logger, "sinfo", []string{"-h", "-o", "%D|%T|%b", "-p", part})
 }
 
+/*
+SlurmGetTotal retrieves the total number of nodes from scontrol.
+Expected scontrol output format: one line per node.
+*/
 func SlurmGetTotal(logger log.Logger) (float64, error) {
 	out, err := Execute(logger, "scontrol", []string{"show", "nodes", "-o"})
 	if err != nil {
@@ -141,6 +153,10 @@ func SlurmGetTotal(logger log.Logger) (float64, error) {
 	return float64(count), nil
 }
 
+/*
+SlurmGetPartitions retrieves a list of all partitions from sinfo.
+Expected sinfo output format: "%R" (Partition name).
+*/
 func SlurmGetPartitions(logger log.Logger) ([]string, error) {
 	out, err := Execute(logger, "sinfo", []string{"-h", "-o", "%R"})
 	if err != nil {
@@ -204,7 +220,7 @@ type NodesCollector struct {
 	logger  log.Logger
 }
 
-// Send all metric descriptions
+
 func (nc *NodesCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- nc.alloc
 	ch <- nc.comp
