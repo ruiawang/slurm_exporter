@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package collector
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +36,7 @@ func TestGPUsMetrics(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Can not open test data: %v", err)
 		}
-		data, _ := ioutil.ReadAll(file)
+		data, _ := io.ReadAll(file)
 		metrics := ParseAllocatedGPUs(data)
 		t.Logf("Allocated: %+v", metrics)
 
@@ -45,7 +45,7 @@ func TestGPUsMetrics(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Can not open test data: %v", err)
 		}
-		data, _ = ioutil.ReadAll(file)
+		data, _ = io.ReadAll(file)
 		metrics = ParseIdleGPUs(data)
 		t.Logf("Idle: %+v", metrics)
 
@@ -54,7 +54,7 @@ func TestGPUsMetrics(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Can not open test data: %v", err)
 		}
-		data, _ = ioutil.ReadAll(file)
+		data, _ = io.ReadAll(file)
 		metrics = ParseTotalGPUs(data)
 		t.Logf("Total: %+v", metrics)
 	}

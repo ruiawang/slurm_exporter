@@ -100,7 +100,7 @@ func (pc *PartitionsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (pc *PartitionsCollector) Collect(ch chan<- prometheus.Metric) {
 	pm, err := ParsePartitionsMetrics(pc.logger)
 	if err != nil {
-		level.Error(pc.logger).Log("msg", "Failed to parse partitions metrics", "err", err)
+		_ = level.Error(pc.logger).Log("msg", "Failed to parse partitions metrics", "err", err)
 		return
 	}
 	for p := range pm {

@@ -21,7 +21,7 @@ func SetCommandTimeout(t time.Duration) {
 
 // Execute is a wrapper around exec.CommandContext to provide logging and a timeout.
 var Execute = func(logger log.Logger, command string, args []string) ([]byte, error) {
-	level.Debug(logger).Log("msg", "Executing command", "command", command, "args", strings.Join(args, " "))
+	_ = level.Debug(logger).Log("msg", "Executing command", "command", command, "args", strings.Join(args, " "))
 
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
@@ -31,13 +31,13 @@ var Execute = func(logger log.Logger, command string, args []string) ([]byte, er
 	if err != nil {
 		// Check if the error is due to the context deadline exceeding.
 		if ctx.Err() == context.DeadlineExceeded {
-			level.Error(logger).Log("msg", "Command timed out", "command", command, "args", strings.Join(args, " "), "timeout", commandTimeout)
+			_ = level.Error(logger).Log("msg", "Command timed out", "command", command, "args", strings.Join(args, " "), "timeout", commandTimeout)
 			return nil, ctx.Err()
 		}
-		level.Error(logger).Log("msg", "Failed to execute command", "command", command, "args", strings.Join(args, " "), "output", string(out), "err", err)
+		_ = level.Error(logger).Log("msg", "Failed to execute command", "command", command, "args", strings.Join(args, " "), "output", string(out), "err", err)
 		return nil, err
 	}
 
-	level.Debug(logger).Log("msg", "Command executed successfully", "command", command)
+	_ = level.Debug(logger).Log("msg", "Command executed successfully", "command", command)
 	return out, nil
 }

@@ -245,7 +245,7 @@ func (c *SchedulerCollector) Describe(ch chan<- *prometheus.Desc) {
 func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
 	sm, err := SchedulerGetMetrics(sc.logger)
 	if err != nil {
-		level.Error(sc.logger).Log("msg", "Failed to get scheduler metrics", "err", err)
+		_ = level.Error(sc.logger).Log("msg", "Failed to get scheduler metrics", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(sc.threads, prometheus.GaugeValue, sm.threads)

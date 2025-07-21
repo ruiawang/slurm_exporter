@@ -87,13 +87,13 @@ func (c *ReservationsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *ReservationsCollector) Collect(ch chan<- prometheus.Metric) {
 	data, err := c.reservationsData()
 	if err != nil {
-		level.Error(c.logger).Log("msg", "Failed to fetch reservation data", "err", err)
+		_ = level.Error(c.logger).Log("msg", "Failed to fetch reservation data", "err", err)
 		return
 	}
 
 	reservations, err := parseReservations(data)
 	if err != nil {
-		level.Error(c.logger).Log("msg", "Failed to parse reservation data", "err", err)
+		_ = level.Error(c.logger).Log("msg", "Failed to parse reservation data", "err", err)
 		return
 	}
 

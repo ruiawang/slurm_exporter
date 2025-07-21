@@ -239,7 +239,7 @@ func (qc *QueueCollector) Describe(ch chan<- *prometheus.Desc) {
 func (qc *QueueCollector) Collect(ch chan<- prometheus.Metric) {
 	qm, err := QueueGetMetrics(qc.logger)
 	if err != nil {
-		level.Error(qc.logger).Log("msg", "Failed to get queue metrics", "err", err)
+		_ = level.Error(qc.logger).Log("msg", "Failed to get queue metrics", "err", err)
 		return
 	}
 	for reason, values := range qm.pending {

@@ -2,97 +2,53 @@ name: Release
 
 on:
   push:
-    branches:
-      - master
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-  pull_request:
+      - 'v*'
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
           cache: true
       - run: make test
 
-  dev:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: test
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.22
-      - name: Set BUILD_DATE environment variable
-        run: echo "BUILD_DATE=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
-      - name: Get latest tag and set GORELEASER_CURRENT_TAG
-        run: |
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "GORELEASER_CURRENT_TAG=${TAG}-dev" >> $GITHUB_ENV
-      - name: Debug GoReleaser Environment Variables
-        run: |
-          echo "BRANCH_NAME: ${{ github.ref_name }}"
-          echo "BUILD_DATE: ${{ env.BUILD_DATE }}"
-          echo "GORELEASER_CURRENT_TAG: ${{ env.GORELEASER_CURRENT_TAG }}"
-          echo "PATH: $PATH"
-          echo "Current directory: $(pwd)"
-          ls -l .goreleaser.dev.yaml
-      - name: Run GoReleaser Dev
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: '~> v2'
-          args: --snapshot --clean --skip=sign --config .goreleaser.dev.yaml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GORELEASER_CURRENT_TAG: ${{ env.GORELEASER_CURRENT_TAG }}
-          BUILD_USER: "${{ github.actor }}"
-          BUILD_DATE: ${{ env.BUILD_DATE }}
-          BRANCH_NAME: ${{ github.ref_name }}
-          REVISION: ${{ github.sha }}
-      - name: Rename Dev Archive
-        run: |
-          mv dist/slurm_exporter.dev.tar.gz dist/slurm_exporter.${{ env.GORELEASER_CURRENT_TAG }}.branch-${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
-      - name: Upload Dev Archive (Linux AMD64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: slurm_exporter.${{ env.GORELEASER_CURRENT_TAG }}.branch-${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
-          path: dist/slurm_exporter.${{ env.GORELEASER_CURRENT_TAG }}.branch-${{ github.ref_name }}.${{ env.BUILD_DATE }}.tar.gz
-      - name: Upload Checksums
-        uses: actions/upload-artifact@v4
-        with:
-          name: slurm_exporter_checksums.txt
-          path: dist/slurm_exporter_checksums.txt
-
   release:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: test
+    needs:
+      - lint
+      - test
+    permissions:
+      contents: write # needed to write releases
+      id-token: write # needed for keyless signing
+      packages: write # needed for ghcr access
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: 1.22
-      - name: Set BUILD_DATE environment variable
-        run: echo "BUILD_DATE=$(date +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+          go-version: '1.22'
+          cache: true
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -102,7 +58,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          BUILD_USER: "${{ github.actor }}"
-          BUILD_DATE: ${{ env.BUILD_DATE }}
-          BRANCH_NAME: ${{ github.ref_name }}
-          REVISION: ${{ github.sha }}
+
+  slsa-goreleaser:
+    needs: release
+    permissions:
+      id-token: write # To sign the provenance.
+      contents: write # To add assets to a release.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_goreleaser_slsa3.yml@v2.0.0
+    with:
+      goreleaser-config: .goreleaser.yaml
+      # We can't use ${{ needs.release.outputs.artifacts }} because it's empty on skipped jobs
+      # (e.g. when running on a pull request).
+      # So we list the artifacts manually.
+      #
+      # Having the runner OS and architecture in the artifact name is a
+      # requirement of the slsa-github-generator.
+      #
+      # You can get the list of artifacts from the GoReleaser output,
+      # or from the summary of a successful release run.
+      assets: |
+        slurm_exporter_linux_amd64.tar.gz
+        slurm_exporter_linux_arm64.tar.gz
+        slurm_exporter_linux_386.tar.gz
+        slurm_exporter_darwin_amd64.tar.gz
+        slurm_exporter_darwin_arm64.tar.gz
+        slurm_exporter_windows_amd64.zip
+        slurm_exporter_windows_arm64.zip
+        slurm_exporter_windows_386.zip
+      # The GoReleaser-generated checksum file.
+      # This is a hard requirement of the slsa-github-generator.
+      checksum-file-name: 'slurm_exporter_checksums.txt'
+      # The tag of the release.
+      tag: ${{ github.ref_name }}

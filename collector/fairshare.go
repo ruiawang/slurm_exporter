@@ -60,7 +60,7 @@ func (fsc *FairShareCollector) Describe(ch chan<- *prometheus.Desc) {
 func (fsc *FairShareCollector) Collect(ch chan<- prometheus.Metric) {
 	fsm, err := ParseFairShareMetrics(fsc.logger)
 	if err != nil {
-		level.Error(fsc.logger).Log("msg", "Failed to parse fairshare metrics", "err", err)
+		_ = level.Error(fsc.logger).Log("msg", "Failed to parse fairshare metrics", "err", err)
 		return
 	}
 	for f := range fsm {

@@ -263,7 +263,7 @@ func (cc *GPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (cc *GPUsCollector) Collect(ch chan<- prometheus.Metric) {
 	cm, err := GPUsGetMetrics(cc.logger)
 	if err != nil {
-		level.Error(cc.logger).Log("msg", "Failed to get GPUs metrics", "err", err)
+		_ = level.Error(cc.logger).Log("msg", "Failed to get GPUs metrics", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(cc.alloc, prometheus.GaugeValue, cm.alloc)

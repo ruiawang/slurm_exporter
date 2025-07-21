@@ -125,7 +125,7 @@ func (nc *NodeCollector) Describe(ch chan<- *prometheus.Desc) {
 func (nc *NodeCollector) Collect(ch chan<- prometheus.Metric) {
 	nodes, err := NodeGetMetrics(nc.logger)
 	if err != nil {
-		level.Error(nc.logger).Log("msg", "Failed to get node metrics", "err", err)
+		_ = level.Error(nc.logger).Log("msg", "Failed to get node metrics", "err", err)
 		return
 	}
 	for node, metrics := range nodes {

@@ -84,7 +84,7 @@ func (uc *UsersCollector) Describe(ch chan<- *prometheus.Desc) {
 func (uc *UsersCollector) Collect(ch chan<- prometheus.Metric) {
 	um, err := ParseUsersMetrics(uc.logger)
 	if err != nil {
-		level.Error(uc.logger).Log("msg", "Failed to parse users metrics", "err", err)
+		_ = level.Error(uc.logger).Log("msg", "Failed to parse users metrics", "err", err)
 		return
 	}
 	for u := range um {

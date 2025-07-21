@@ -95,7 +95,7 @@ func (ac *AccountsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (ac *AccountsCollector) Collect(ch chan<- prometheus.Metric) {
 	data, err := AccountsData(ac.logger)
 	if err != nil {
-		level.Error(ac.logger).Log("msg", "Failed to get accounts data", "err", err)
+		_ = level.Error(ac.logger).Log("msg", "Failed to get accounts data", "err", err)
 		return
 	}
 	am := ParseAccountsMetrics(data)

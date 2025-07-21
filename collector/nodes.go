@@ -38,20 +38,9 @@ func NodesGetMetrics(logger log.Logger, part string) (*NodesMetrics, error) {
 
 
 func InitFeatureSet(nm *NodesMetrics, feature_set string) {
-	//lint:file-ignore SA4018 If the feature set exists keep, else assign nil
-	nm.alloc[feature_set] = nm.alloc[feature_set]
-	nm.comp[feature_set] = nm.comp[feature_set]
-	nm.down[feature_set] = nm.down[feature_set]
-	nm.drain[feature_set] = nm.drain[feature_set]
-	nm.err[feature_set] = nm.err[feature_set]
-	nm.fail[feature_set] = nm.fail[feature_set]
-	nm.idle[feature_set] = nm.idle[feature_set]
-	nm.maint[feature_set] = nm.maint[feature_set]
-	nm.mix[feature_set] = nm.mix[feature_set]
-	nm.resv[feature_set] = nm.resv[feature_set]
-	nm.other[feature_set] = nm.other[feature_set]
-	nm.planned[feature_set] = nm.planned[feature_set]
-	nm.total[feature_set] = nm.total[feature_set]
+	// This function is intentionally left empty.
+	// It was previously used to initialize map keys, but this is not necessary in Go.
+	// The linter correctly identified self-assignments here.
 }
 
 func ParseNodesMetrics(input []byte) *NodesMetrics {
@@ -241,7 +230,7 @@ func SendFeatureSetMetric(ch chan<- prometheus.Metric, desc *prometheus.Desc, va
 func (nc *NodesCollector) Collect(ch chan<- prometheus.Metric) {
 	partitions, err := SlurmGetPartitions(nc.logger)
 	if err != nil {
-		level.Error(nc.logger).Log("msg", "Failed to get partitions", "err", err)
+		_ = level.Error(nc.logger).Log("msg", "Failed to get partitions", "err", err)
 		return
 	}
 	for _, part := range partitions {
@@ -251,7 +240,7 @@ func (nc *NodesCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		nm, err := NodesGetMetrics(nc.logger, part)
 		if err != nil {
-			level.Error(nc.logger).Log("msg", "Failed to get nodes metrics", "partition", part, "err", err)
+			_ = level.Error(nc.logger).Log("msg", "Failed to get nodes metrics", "partition", part, "err", err)
 			continue
 		}
 		SendFeatureSetMetric(ch, nc.alloc, prometheus.GaugeValue, nm.alloc, part)
@@ -269,7 +258,7 @@ func (nc *NodesCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	total, err := SlurmGetTotal(nc.logger)
 	if err != nil {
-		level.Error(nc.logger).Log("msg", "Failed to get total nodes", "err", err)
+		_ = level.Error(nc.logger).Log("msg", "Failed to get total nodes", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(nc.total, prometheus.GaugeValue, total)

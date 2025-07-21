@@ -90,7 +90,7 @@ func (cc *CPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (cc *CPUsCollector) Collect(ch chan<- prometheus.Metric) {
 	cm, err := CPUsGetMetrics(cc.logger)
 	if err != nil {
-		level.Error(cc.logger).Log("msg", "Failed to get CPUs metrics", "err", err)
+		_ = level.Error(cc.logger).Log("msg", "Failed to get CPUs metrics", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(cc.alloc, prometheus.GaugeValue, cm.alloc)

@@ -72,9 +72,9 @@ func registerCollectors(logger log.Logger) {
 	for name, constructor := range collectorConstructors {
 		if *collectorState[name] {
 			prometheus.MustRegister(constructor(logger))
-			level.Info(logger).Log("msg", "Collector enabled", "collector", name)
+			_ = level.Info(logger).Log("msg", "Collector enabled", "collector", name)
 		} else {
-			level.Info(logger).Log("msg", "Collector disabled", "collector", name)
+			_ = level.Info(logger).Log("msg", "Collector disabled", "collector", name)
 		}
 	}
 }
@@ -108,8 +108,8 @@ func main() {
 	registerCollectors(logger)
 
 	// Log server startup details
-	level.Info(logger).Log("msg", "Starting Server...")
-	level.Info(logger).Log("msg", "Command timeout set", "timeout", *commandTimeout)
+	_ = level.Info(logger).Log("msg", "Starting Server...")
+	_ = level.Info(logger).Log("msg", "Command timeout set", "timeout", *commandTimeout)
 
 	// Define the root handler for '/'
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -125,7 +125,7 @@ func main() {
 
 	// Use exporter toolkit to start the server (supports TLS, Basic Auth, etc.)
 	if err := web.ListenAndServe(server, toolkitFlags, logger); err != nil {
-		level.Error(logger).Log("msg", "Error starting HTTP server", "err", err)
+		_ = level.Error(logger).Log("msg", "Error starting HTTP server", "err", err)
 		os.Exit(1)
 	}
 }
