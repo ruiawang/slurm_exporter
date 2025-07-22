@@ -5,6 +5,7 @@ project_name: slurm_exporter
 
 release:
   prerelease: auto
+  name_template: "{{.Tag}}-next"
 
 builds:
   - id: slurm_exporter-dev
