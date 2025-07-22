@@ -37,7 +37,7 @@ var (
 	// Flags for command-line configuration
 	commandTimeout = kingpin.Flag("command.timeout", "Timeout for executing Slurm commands.").Default("5s").Duration()
 	logLevel       = kingpin.Flag("log.level", "Only log messages with the given severity or above. One of: [debug, info, warn, error]").Default("info").Enum("debug", "info", "warn", "error")
-	toolkitFlags   = webflag.AddFlags(kingpin.CommandLine, ":8080")
+	toolkitFlags   = webflag.AddFlags(kingpin.CommandLine, ":9341")
 
 	// Map to store the state of collectors
 	collectorState = make(map[string]*bool)

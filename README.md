@@ -1,191 +1,262 @@
-# Prometheus Slurm Exporter
+# Prometheus Slurm Exporter 🚀
 
 Prometheus collector and exporter for metrics extracted from the [Slurm](https://slurm.schedmd.com/overview.html) resource scheduling system.
 
 ---
 
-## Table of Contents
+## ✨ Features
 
-- [Prometheus Slurm Exporter](#prometheus-slurm-exporter)
-  - [Table of Contents](#table-of-contents)
-  - [Features](#features)
-  - [Installation](#installation)
-  - [Usage](#usage)
-  - [Metrics](#metrics)
-    - [CPU Metrics](#cpu-metrics)
-    - [GPU Metrics](#gpu-metrics)
-    - [Node Metrics](#node-metrics)
-      - [Additional Node Usage Info](#additional-node-usage-info)
-    - [Job Metrics](#job-metrics)
-    - [Partition Metrics](#partition-metrics)
-    - [Jobs per Account and User](#jobs-per-account-and-user)
-    - [Scheduler Metrics](#scheduler-metrics)
-  - [Prometheus Configuration](#prometheus-configuration)
-  - [Grafana Dashboard](#grafana-dashboard)
-  - [License](#license)
-  - [About this fork](#about-this-fork)
+- ✅ Exports a wide range of metrics from Slurm, including nodes, partitions, jobs, CPUs, and GPUs.
+- ✅ All metric collectors are optional and can be enabled/disabled via flags.
+- ✅ Supports TLS and Basic Authentication for secure connections.
+- ✅ Ready-to-use Grafana dashboard.
 
 ---
 
-## Features
+## 📦 Installation
 
-- Export CPU, GPU, node, job, and partition metrics from Slurm
-- Optional GPU accounting (`--gpus-acct`)
-- TLS and Basic Auth support via [Exporter Toolkit](https://github.com/prometheus/exporter-toolkit)
-- Ready-to-use Grafana dashboard
+There are two recommended ways to install the Slurm Exporter.
+
+### 1. From Pre-compiled Releases
+
+This is the easiest method for most users.
+
+1.  Download the latest release for your OS and architecture from the [GitHub Releases](https://github.com/sckyzo/slurm_exporter/releases) page. 📥
+2.  Place the `slurm_exporter` binary in a suitable location on a node with Slurm CLI access, such as `/usr/local/bin/`.
+3.  Ensure the binary is executable:
+    ```bash
+    chmod +x /usr/local/bin/slurm_exporter
+    ```
+4.  (Optional) To run the exporter as a service, you can adapt the example Systemd unit file provided in this repository at [systemd/slurm_exporter.service](systemd/slurm_exporter.service).
+    -   Copy it to `/etc/systemd/system/slurm_exporter.service` and customize it for your environment (especially the `ExecStart` path).
+    -   Reload the Systemd daemon, then enable and start the service:
+        ```bash
+        sudo systemctl daemon-reload
+        sudo systemctl enable slurm_exporter
+        sudo systemctl start slurm_exporter
+        ```
+
+### 2. From Source
+
+If you want to build the exporter yourself, you can do so using the provided Makefile. 👩‍💻
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/sckyzo/slurm_exporter.git
+    cd slurm_exporter
+    ```
+2.  Build the binary:
+    ```bash
+    make build
+    ```
+3.  The new binary will be available at `bin/slurm_exporter`. You can then copy it to a location like `/usr/local/bin/` and set up the Systemd service as described in the section above.
+
+For more details on the development environment and dependencies, please refer to the [DEVELOPMENT.md](DEVELOPMENT.md) file.
 
 ---
 
-## Installation
+## ⚙️ Usage
 
-1. Build as described in [DEVELOPMENT.md](DEVELOPMENT.md) and copy `bin/slurm_exporter` to a node with Slurm CLI access.
-2. (Optional) Use the Systemd unit: [lib/systemd/prometheus-slurm-exporter.service](lib/systemd/prometheus-slurm-exporter.service)  
-   *Note: I have not personally tested this unit; it is a leftover from the original fork.*
-3. (Optional) Snap package: see [packages/snap/README.md](packages/snap/README.md)  
-   *Note: I have not personally tested the Snap packaging; it is a leftover from the original fork.*
+The exporter can be configured using command-line flags.
 
----
-
-## Usage
-
-**Basic:**
+**Basic execution:**
 ```bash
-./slurm_exporter --web.listen-address=:8080
+./slurm_exporter --web.listen-address=":9341"
 ```
 
-**With GPU accounting:**
+**Using a configuration file for web settings (TLS/Basic Auth):**
 ```bash
-./slurm_exporter --web.listen-address=:8080 --gpus-acct
+./slurm_exporter --web.config.file=/path/to/web-config.yml
 ```
+For details on the `web-config.yml` format, see the [Exporter Toolkit documentation](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
 
-**With TLS/Basic Auth:**
+### Enabling and Disabling Collectors
+
+By default, all collectors are **enabled**, except for the `gpus` collector which is **disabled**.
+
+You can control which collectors are active using the `--collector.<name>` and `--no-collector.<name>` flags.
+
+**Example: Disable the `scheduler` and `partitions` collectors**
 ```bash
-./slurm_exporter --web.listen-address=:8080 --web.config.file=/path/to/web-config.yml
+./slurm_exporter --no-collector.scheduler --no-collector.partitions
 ```
 
-> **Note:** GPU accounting is **disabled by default**. Use `--gpus-acct` to enable.
-
-**Sample `web-config.yml`:**
-```yaml
-tls_server_config:
-  cert_file: /path/to/cert.crt
-  key_file: /path/to/cert.key
-basic_auth_users:
-  admin: $2y$12$EXAMPLE_ENCRYPTED_PASSWORD_HASH
+**Example: Enable the `gpus` collector**
+```bash
+./slurm_exporter --collector.gpus
 ```
-See [Exporter Toolkit documentation](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md) for details.
+
+**Example: Run only the `nodes` and `cpus` collectors**
+This requires disabling all other collectors individually.
+```bash
+./slurm_exporter \
+  --no-collector.accounts \
+  --no-collector.fairshare \
+  --no-collector.gpus \
+  --no-collector.node \
+  --no-collector.partitions \
+  --no-collector.queue \
+  --no-collector.reservations \
+  --no-collector.scheduler \
+  --no-collector.info \
+  --no-collector.users
+```
 
 ---
 
-## Metrics
+## 📊 Metrics
 
-### CPU Metrics
+The exporter provides a wide range of metrics, each collected by a specific, toggleable collector.
 
-| Metric      | Description                                      |
-|-------------|--------------------------------------------------|
-| Allocated   | CPUs allocated to a job                          |
-| Idle        | CPUs available for use                           |
-| Other       | CPUs unavailable for use                         |
-| Total       | Total number of CPUs                             |
+### `accounts` Collector
+Provides job statistics aggregated by Slurm account.
+- **Command:** `squeue -a -r -h -o "%A|%a|%T|%C"`
 
-- Extracted from: [`sinfo`](https://slurm.schedmd.com/sinfo.html)
-- [CPU Management Guide](https://slurm.schedmd.com/cpu_management.html)
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_account_jobs_pending` | Pending jobs for account | `account` |
+| `slurm_account_jobs_running` | Running jobs for account | `account` |
+| `slurm_account_cpus_running` | Running cpus for account | `account` |
+| `slurm_account_jobs_suspended` | Suspended jobs for account | `account` |
+
+### `cpus` Collector
+Provides global statistics on CPU states for the entire cluster.
+- **Command:** `sinfo -h -o "%C"`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_cpus_alloc` | Allocated CPUs | (none) |
+| `slurm_cpus_idle` | Idle CPUs | (none) |
+| `slurm_cpus_other` | Mix CPUs | (none) |
+| `slurm_cpus_total` | Total CPUs | (none) |
+
+### `fairshare` Collector
+Reports the calculated fairshare factor for each account.
+- **Command:** `sshare -n -P -o "account,fairshare"`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_account_fairshare` | FairShare for account | `account` |
+
+### `gpus` Collector
+Provides global statistics on GPU states for the entire cluster.
+> ⚠️ **Note:** This collector is disabled by default. Enable it with `--collector.gpus`.
+- **Command:** `sinfo` (with various formats)
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_gpus_alloc` | Allocated GPUs | (none) |
+| `slurm_gpus_idle` | Idle GPUs | (none) |
+| `slurm_gpus_other` | Other GPUs | (none) |
+| `slurm_gpus_total` | Total GPUs | (none) |
+| `slurm_gpus_utilization` | Total GPU utilization | (none) |
+
+### `info` Collector
+Exposes the version of Slurm and the availability of different Slurm binaries.
+- **Command:** `<binary> --version`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_info` | Information on Slurm version and binaries | `type`, `binary`, `version` |
+
+### `node` Collector
+Provides detailed, per-node metrics for CPU and memory usage.
+- **Command:** `sinfo -h -N -O "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition"`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_node_cpu_alloc` | Allocated CPUs per node | `node`, `status`, `partition` |
+| `slurm_node_cpu_idle` | Idle CPUs per node | `node`, `status`, `partition` |
+| `slurm_node_cpu_other` | Other CPUs per node | `node`, `status`, `partition` |
+| `slurm_node_cpu_total` | Total CPUs per node | `node`, `status`, `partition` |
+| `slurm_node_mem_alloc` | Allocated memory per node | `node`, `status`, `partition` |
+| `slurm_node_mem_total` | Total memory per node | `node`, `status`, `partition` |
+| `slurm_node_status` | Node Status with partition (1 if up) | `node`, `status`, `partition` |
+
+### `nodes` Collector
+Provides aggregated metrics on node states for the cluster.
+- **Commands:** `sinfo -h -o "%D|%T|%b"`, `scontrol show nodes -o`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_nodes_alloc` | Allocated nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_comp` | Completing nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_down` | Down nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_drain` | Drain nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_err` | Error nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_fail` | Fail nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_idle` | Idle nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_maint` | Maint nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_mix` | Mix nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_resv` | Reserved nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_other` | Nodes reported with an unknown state | `partition`, `active_feature_set` |
+| `slurm_nodes_planned` | Planned nodes | `partition`, `active_feature_set` |
+| `slurm_nodes_total` | Total number of nodes | (none) |
+
+### `partitions` Collector
+Provides metrics on CPU usage and pending jobs for each partition.
+- **Commands:** `sinfo -h -o "%R,%C"`, `squeue -a -r -h -o "%P" --states=PENDING`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_partition_cpus_allocated` | Allocated CPUs for partition | `partition` |
+| `slurm_partition_cpus_idle` | Idle CPUs for partition | `partition` |
+| `slurm_partition_cpus_other` | Other CPUs for partition | `partition` |
+| `slurm_partition_jobs_pending` | Pending jobs for partition | `partition` |
+| `slurm_partition_cpus_total` | Total CPUs for partition | `partition` |
+
+### `queue` Collector
+Provides detailed metrics on job states and resource usage.
+- **Command:** `squeue -h -o "%P,%T,%C,%r,%u"`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_queue_pending` | Pending jobs in queue | `user`, `partition`, `reason` |
+| `slurm_queue_running` | Running jobs in the cluster | `user`, `partition` |
+| `slurm_queue_suspended` | Suspended jobs in the cluster | `user`, `partition` |
+| `slurm_cores_pending` | Pending cores in queue | `user`, `partition`, `reason` |
+| `slurm_cores_running` | Running cores in the cluster | `user`, `partition` |
+| `...` | (and many other states: `completed`, `failed`, etc.) | `user`, `partition` |
+
+### `reservations` Collector
+Provides metrics about active Slurm reservations.
+- **Command:** `scontrol show reservation`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_reservation_info` | A metric with a constant '1' value labeled by reservation details | `reservation_name`, `state`, `users`, `nodes`, `partition`, `flags` |
+| `slurm_reservation_start_time_seconds` | The start time of the reservation in seconds since the Unix epoch | `reservation_name` |
+| `slurm_reservation_end_time_seconds` | The end time of the reservation in seconds since the Unix epoch | `reservation_name` |
+| `slurm_reservation_node_count` | The number of nodes allocated to the reservation | `reservation_name` |
+| `slurm_reservation_core_count` | The number of cores allocated to the reservation | `reservation_name` |
+
+### `scheduler` Collector
+Provides internal performance metrics from the `slurmctld` daemon.
+- **Command:** `sdiag`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_scheduler_threads` | Number of scheduler threads | (none) |
+| `slurm_scheduler_queue_size` | Length of the scheduler queue | (none) |
+| `slurm_scheduler_mean_cycle` | Scheduler mean cycle time (microseconds) | (none) |
+| `slurm_rpc_stats` | RPC count statistic | `operation` |
+| `slurm_user_rpc_stats` | RPC count statistic per user | `user` |
+| `...` | (and many other backfill and RPC time metrics) | `operation` or `user` |
+
+### `users` Collector
+Provides job statistics aggregated by user.
+- **Command:** `squeue -a -r -h -o "%A|%u|%T|%C"`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_user_jobs_pending` | Pending jobs for user | `user` |
+| `slurm_user_jobs_running` | Running jobs for user | `user` |
+| `slurm_user_cpus_running` | Running cpus for user | `user` |
+| `slurm_user_jobs_suspended` | Suspended jobs for user | `user` |
 
 ---
 
-### GPU Metrics
-
-| Metric      | Description                                      |
-|-------------|--------------------------------------------------|
-| Allocated   | GPUs allocated to a job                          |
-| Other       | GPUs unavailable for use                         |
-| Total       | Total number of GPUs                             |
-| Utilization | Total GPU utilization on the cluster             |
-
-- Extracted from: [`sinfo`](https://slurm.schedmd.com/sinfo.html), [`sacct`](https://slurm.schedmd.com/sacct.html)
-- [GRES scheduling](https://slurm.schedmd.com/gres.html)
-
-> **IMPORTANT:** GPU accounting is **disabled by default**. Enable it with `--gpus-acct`.
-
----
-
-### Node Metrics
-
-| State       | Description                                      |
-|-------------|--------------------------------------------------|
-| allocated   | Allocated to one or more jobs                    |
-| completing  | Jobs on node are completing                      |
-| down        | Node unavailable                                 |
-| drain       | Node drained/draining                            |
-| fail        | Node expected to fail soon                       |
-| error       | Node in error state                              |
-| idle        | Not allocated to any jobs                        |
-| maint       | Marked for maintenance                           |
-| mixed       | Some CPUs allocated, others idle                 |
-| planned     | Held for multi-node job launch                   |
-| resv        | In advanced reservation                          |
-
-- Extracted from: [`sinfo`](https://slurm.schedmd.com/sinfo.html)
-
-#### Additional Node Usage Info
-
-Since v0.18: CPUs and memory (allocated, idle, total) per node, with labels (hostname, status).
-
----
-
-### Job Metrics
-
-| State                | Description                                 |
-|----------------------|---------------------------------------------|
-| PENDING              | Awaiting resource allocation                |
-| PENDING_DEPENDENCY   | Awaiting dependency resolution              |
-| RUNNING              | Currently allocated resources               |
-| SUSPENDED            | Execution suspended                         |
-| CANCELLED            | Cancelled by user/admin                     |
-| COMPLETING           | In process of completion                    |
-| COMPLETED            | Terminated with exit code 0                 |
-| CONFIGURING          | Waiting for resources to be ready           |
-| FAILED               | Terminated with non-zero exit code          |
-| TIMEOUT              | Terminated on time limit                    |
-| PREEMPTED            | Terminated due to preemption                |
-| NODE_FAIL            | Terminated due to node failure              |
-
-- Extracted from: [`squeue`](https://slurm.schedmd.com/squeue.html)
-
----
-
-### Partition Metrics
-
-| Metric                | Description                                |
-|-----------------------|--------------------------------------------|
-| Running/Suspended Jobs| Per partition, by account and user         |
-| CPUs                  | Total/allocated/idle per partition/user ID |
-
----
-
-### Jobs per Account and User
-
-- Running, pending, and suspended jobs per Slurm account and user (from [`squeue`](https://slurm.schedmd.com/squeue.html)).
-
----
-
-### Scheduler Metrics
-
-| Metric                 | Description                               |
-|------------------------|-------------------------------------------|
-| Server Thread count    | Active `slurmctld` threads                |
-| Queue size             | Scheduler queue length                     |
-| DBD Agent queue size   | SlurmDBD message queue length              |
-| Last cycle             | Time for last scheduling cycle (µs)        |
-| Mean cycle             | Mean scheduling cycle time                 |
-| Cycles per minute      | Scheduling executions per minute           |
-| Backfill metrics       | Backfilling jobs: cycle times, depth, etc. |
-
-- Extracted from: [`sdiag`](https://slurm.schedmd.com/sdiag.html)
-
----
-
-## Prometheus Configuration
+## 📡 Prometheus Configuration
 
 ```yaml
 scrape_configs:
@@ -193,11 +264,11 @@ scrape_configs:
     scrape_interval: 30s
     scrape_timeout: 30s
     static_configs:
-      - targets: ['slurm_host.fqdn:8080']
+      - targets: ['slurm_host.fqdn:9341']
 ```
 
-- **scrape_interval**: 30s to avoid overloading Slurm master.
-- **scrape_timeout**: Set to avoid `context_deadline_exceeded` errors.
+- **scrape_interval**: A 30s interval is recommended to avoid overloading the Slurm master with frequent command executions.
+- **scrape_timeout**: Should be equal to or less than the `scrape_interval` to prevent `context_deadline_exceeded` errors.
 
 Check config:
 ```bash
@@ -206,7 +277,7 @@ promtool check-config prometheus.yml
 
 ---
 
-## Grafana Dashboard
+## 📈 Grafana Dashboard
 
 A [Grafana dashboard](https://grafana.com/dashboards/4323) is available:
 
@@ -216,7 +287,7 @@ A [Grafana dashboard](https://grafana.com/dashboards/4323) is available:
 
 ---
 
-## License
+## 📜 License
 
 This project is licensed under the GNU General Public License, version 3 or later.
 
@@ -224,9 +295,9 @@ This project is licensed under the GNU General Public License, version 3 or late
 
 ---
 
-## About this fork
+## 🍴 About this fork
 
-This project is a **fork** of [cea-hpc/slurm_exporter](https://github.com/cea-hpc/slurm_exporter),  
+This project is a **fork** of [cea-hpc/slurm_exporter](https://github.com/cea-hpc/slurm_exporter),
 which itself is a fork of [vpenso/prometheus-slurm-exporter](https://github.com/vpenso/prometheus-slurm-exporter) (now apparently unmaintained).
 
 Feel free to contribute or open issues!
