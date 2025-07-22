@@ -17,6 +17,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch all tags
+        run: git fetch --force --tags
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -28,7 +31,7 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --config .goreleaser.dev.yaml --clean
+          args: release --config .goreleaser.dev.yaml --clean --snapshot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUILD_USER: "${{ github.actor }}"
