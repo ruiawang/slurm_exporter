@@ -4,7 +4,7 @@ version: 2
 project_name: slurm_exporter
 
 release:
-  disable: true
+  prerelease: auto
 
 builds:
   - id: slurm_exporter-dev
