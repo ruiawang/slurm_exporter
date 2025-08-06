@@ -91,7 +91,7 @@ func main() {
 	// Setup logger with the configured level and format
 	var log *logger.Logger
 	if *logFormat == "json" {
-		log = logger.NewLogger(*logLevel)
+		log = logger.NewJSONLogger(*logLevel)
 	} else {
 		log = logger.NewTextLogger(*logLevel)
 	}
