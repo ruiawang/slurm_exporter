@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 var (
@@ -20,8 +19,8 @@ func SetCommandTimeout(t time.Duration) {
 }
 
 // Execute is a wrapper around exec.CommandContext to provide logging and a timeout.
-var Execute = func(logger log.Logger, command string, args []string) ([]byte, error) {
-	_ = level.Debug(logger).Log("msg", "Executing command", "command", command, "args", strings.Join(args, " "))
+var Execute = func(logger *logger.Logger, command string, args []string) ([]byte, error) {
+	logger.Debug("Executing command", "command", command, "args", strings.Join(args, " "))
 
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
@@ -31,13 +30,13 @@ var Execute = func(logger log.Logger, command string, args []string) ([]byte, er
 	if err != nil {
 		// Check if the error is due to the context deadline exceeding.
 		if ctx.Err() == context.DeadlineExceeded {
-			_ = level.Error(logger).Log("msg", "Command timed out", "command", command, "args", strings.Join(args, " "), "timeout", commandTimeout)
+			logger.Error("Command timed out", "command", command, "args", strings.Join(args, " "), "timeout", commandTimeout)
 			return nil, ctx.Err()
 		}
-		_ = level.Error(logger).Log("msg", "Failed to execute command", "command", command, "args", strings.Join(args, " "), "output", string(out), "err", err)
+		logger.Error("Failed to execute command", "command", command, "args", strings.Join(args, " "), "output", string(out), "err", err)
 		return nil, err
 	}
 
-	_ = level.Debug(logger).Log("msg", "Command executed successfully", "command", command)
+	logger.Debug("Command executed successfully", "command", command)
 	return out, nil
 }

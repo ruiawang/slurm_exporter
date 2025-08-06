@@ -5,16 +5,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 /*
 AccountsData executes the squeue command to retrieve job information by account.
 Expected squeue output format: "%A|%a|%T|%C" (Job ID|Account|State|CPUs).
 */
-func AccountsData(logger log.Logger) ([]byte, error) {
+func AccountsData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%A|%a|%T|%C"})
 }
 
@@ -64,10 +63,10 @@ type AccountsCollector struct {
 	running      *prometheus.Desc
 	running_cpus *prometheus.Desc
 	suspended    *prometheus.Desc
-	logger       log.Logger
+	logger       *logger.Logger
 }
 
-func NewAccountsCollector(logger log.Logger) *AccountsCollector {
+func NewAccountsCollector(logger *logger.Logger) *AccountsCollector {
 	labels := []string{"account"}
 	return &AccountsCollector{
 		pending:      prometheus.NewDesc("slurm_account_jobs_pending", "Pending jobs for account", labels, nil),
@@ -88,7 +87,7 @@ func (ac *AccountsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (ac *AccountsCollector) Collect(ch chan<- prometheus.Metric) {
 	data, err := AccountsData(ac.logger)
 	if err != nil {
-		_ = level.Error(ac.logger).Log("msg", "Failed to get accounts data", "err", err)
+		ac.logger.Error("Failed to get accounts data", "err", err)
 		return
 	}
 	am := ParseAccountsMetrics(data)

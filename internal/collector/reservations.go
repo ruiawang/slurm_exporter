@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
+	
+	
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 const (
@@ -32,7 +33,7 @@ type ReservationInfo struct {
 
 // ReservationsCollector collects metrics about Slurm reservations.
 type ReservationsCollector struct {
-	logger    log.Logger
+	logger    *logger.Logger
 	info      *prometheus.Desc
 	startTime *prometheus.Desc
 	endTime   *prometheus.Desc
@@ -41,7 +42,7 @@ type ReservationsCollector struct {
 }
 
 
-func NewReservationsCollector(logger log.Logger) *ReservationsCollector {
+func NewReservationsCollector(logger *logger.Logger) *ReservationsCollector {
 	labels := []string{"reservation_name", "state", "users", "nodes", "partition", "flags"}
 	return &ReservationsCollector{
 		logger: logger,
@@ -87,13 +88,13 @@ func (c *ReservationsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *ReservationsCollector) Collect(ch chan<- prometheus.Metric) {
 	data, err := c.reservationsData()
 	if err != nil {
-		_ = level.Error(c.logger).Log("msg", "Failed to fetch reservation data", "err", err)
+		c.logger.Error("Failed to fetch reservation data", "err", err)
 		return
 	}
 
 	reservations, err := parseReservations(data)
 	if err != nil {
-		_ = level.Error(c.logger).Log("msg", "Failed to parse reservation data", "err", err)
+		c.logger.Error("Failed to parse reservation data", "err", err)
 		return
 	}
 

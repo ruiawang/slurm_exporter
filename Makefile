@@ -8,7 +8,7 @@ OS ?= linux
 ARCH ?= amd64
 GOPATH := $(shell pwd)/go/modules
 GOBIN := bin/$(PROJECT_NAME)
-GOFILES := $(wildcard *.go)
+GOFILES := $(wildcard cmd/slurm_exporter/*.go)
 GO_URL := https://dl.google.com/go/go$(GO_VERSION).$(OS)-$(ARCH).tar.gz
 GOPATH_ENV := GOPATH=$(GOPATH) PATH=$(shell pwd)/go/bin:$(PATH)
 
@@ -57,10 +57,10 @@ setup:
 .PHONY: build
 build: $(GOBIN)
 
-$(GOBIN): go/modules/pkg/mod $(GOFILES)
+$(GOBIN): go/modules/pkg/mod
 	@echo "Building $(GOBIN)"
 	mkdir -p bin
-	CGO_ENABLED=0 go build -v -ldflags "$(LDFLAGS)" -o $(GOBIN)
+	CGO_ENABLED=0 go build -v -ldflags "$(LDFLAGS)" -o $(GOBIN) ./cmd/slurm_exporter
 
 # Target to download Go modules
 go/modules/pkg/mod: go.mod

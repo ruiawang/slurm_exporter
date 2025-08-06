@@ -5,9 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
+	
+	
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 /*
@@ -43,7 +44,7 @@ type SchedulerMetrics struct {
 SchedulerData executes the sdiag command to retrieve scheduler statistics.
 Expected sdiag output format: various key:value pairs and RPC statistics sections.
 */
-func SchedulerData(logger log.Logger) ([]byte, error) {
+func SchedulerData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "sdiag", nil)
 }
 
@@ -198,7 +199,7 @@ func ParseRpcStats(lines []string) []map[string]float64 {
 }
 
 
-func SchedulerGetMetrics(logger log.Logger) (*SchedulerMetrics, error) {
+func SchedulerGetMetrics(logger *logger.Logger) (*SchedulerMetrics, error) {
 	data, err := SchedulerData(logger)
 	if err != nil {
 		return nil, err
@@ -232,7 +233,7 @@ type SchedulerCollector struct {
 	user_rpc_stats_count              *prometheus.Desc
 	user_rpc_stats_avg_time           *prometheus.Desc
 	user_rpc_stats_total_time         *prometheus.Desc
-	logger                            log.Logger
+	logger                            *logger.Logger
 }
 
 
@@ -261,7 +262,7 @@ func (c *SchedulerCollector) Describe(ch chan<- *prometheus.Desc) {
 func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
 	sm, err := SchedulerGetMetrics(sc.logger)
 	if err != nil {
-		_ = level.Error(sc.logger).Log("msg", "Failed to get scheduler metrics", "err", err)
+		sc.logger.Error("Failed to get scheduler metrics", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(sc.threads, prometheus.GaugeValue, sm.threads)
@@ -298,7 +299,7 @@ func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 
-func NewSchedulerCollector(logger log.Logger) *SchedulerCollector {
+func NewSchedulerCollector(logger *logger.Logger) *SchedulerCollector {
 	rpc_stats_labels := make([]string, 0, 1)
 	rpc_stats_labels = append(rpc_stats_labels, "operation")
 	user_rpc_stats_labels := make([]string, 0, 1)

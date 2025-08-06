@@ -5,9 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 type GPUsMetrics struct {
@@ -18,7 +17,7 @@ type GPUsMetrics struct {
 	utilization float64
 }
 
-func GPUsGetMetrics(logger log.Logger) (*GPUsMetrics, error) {
+func GPUsGetMetrics(logger *logger.Logger) (*GPUsMetrics, error) {
 	return ParseGPUsMetrics(logger)
 }
 
@@ -156,7 +155,7 @@ func ParseTotalGPUs(data []byte) float64 {
 	return num_gpus
 }
 
-func ParseGPUsMetrics(logger log.Logger) (*GPUsMetrics, error) {
+func ParseGPUsMetrics(logger *logger.Logger) (*GPUsMetrics, error) {
 	var gm GPUsMetrics
 	totalGPUsData, err := TotalGPUsData(logger)
 	if err != nil {
@@ -187,17 +186,17 @@ func ParseGPUsMetrics(logger log.Logger) (*GPUsMetrics, error) {
 	return &gm, nil
 }
 
-func AllocatedGPUsData(logger log.Logger) ([]byte, error) {
+func AllocatedGPUsData(logger *logger.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,GresUsed:", "--state=allocated"}
 	return Execute(logger, "sinfo", args)
 }
 
-func IdleGPUsData(logger log.Logger) ([]byte, error) {
+func IdleGPUsData(logger *logger.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,Gres: ,GresUsed:", "--state=idle,allocated"}
 	return Execute(logger, "sinfo", args)
 }
 
-func TotalGPUsData(logger log.Logger) ([]byte, error) {
+func TotalGPUsData(logger *logger.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,Gres:"}
 	return Execute(logger, "sinfo", args)
 }
@@ -209,7 +208,7 @@ func TotalGPUsData(logger log.Logger) ([]byte, error) {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 
-func NewGPUsCollector(logger log.Logger) *GPUsCollector {
+func NewGPUsCollector(logger *logger.Logger) *GPUsCollector {
 	return &GPUsCollector{
 		alloc:       prometheus.NewDesc("slurm_gpus_alloc", "Allocated GPUs", nil, nil),
 		idle:        prometheus.NewDesc("slurm_gpus_idle", "Idle GPUs", nil, nil),
@@ -226,7 +225,7 @@ type GPUsCollector struct {
 	other       *prometheus.Desc
 	total       *prometheus.Desc
 	utilization *prometheus.Desc
-	logger      log.Logger
+	logger      *logger.Logger
 }
 
 
@@ -240,7 +239,7 @@ func (cc *GPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (cc *GPUsCollector) Collect(ch chan<- prometheus.Metric) {
 	cm, err := GPUsGetMetrics(cc.logger)
 	if err != nil {
-		_ = level.Error(cc.logger).Log("msg", "Failed to get GPUs metrics", "err", err)
+		cc.logger.Error("Failed to get GPUs metrics", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(cc.alloc, prometheus.GaugeValue, cm.alloc)

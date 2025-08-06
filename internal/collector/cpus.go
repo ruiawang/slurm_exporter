@@ -4,9 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 type CPUsMetrics struct {
@@ -16,7 +15,7 @@ type CPUsMetrics struct {
 	total float64
 }
 
-func CPUsGetMetrics(logger log.Logger) (*CPUsMetrics, error) {
+func CPUsGetMetrics(logger *logger.Logger) (*CPUsMetrics, error) {
 	data, err := CPUsData(logger)
 	if err != nil {
 		return nil, err
@@ -45,7 +44,7 @@ func ParseCPUsMetrics(input []byte) *CPUsMetrics {
 CPUsData executes the sinfo command to retrieve CPU information.
 Expected sinfo output format: "%C" (allocated/idle/other/total CPUs).
 */
-func CPUsData(logger log.Logger) ([]byte, error) {
+func CPUsData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "sinfo", []string{"-h", "-o", "%C"})
 }
 
@@ -55,7 +54,7 @@ func CPUsData(logger log.Logger) ([]byte, error) {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 
-func NewCPUsCollector(logger log.Logger) *CPUsCollector {
+func NewCPUsCollector(logger *logger.Logger) *CPUsCollector {
 	return &CPUsCollector{
 		alloc:  prometheus.NewDesc("slurm_cpus_alloc", "Allocated CPUs", nil, nil),
 		idle:   prometheus.NewDesc("slurm_cpus_idle", "Idle CPUs", nil, nil),
@@ -70,7 +69,7 @@ type CPUsCollector struct {
 	idle   *prometheus.Desc
 	other  *prometheus.Desc
 	total  *prometheus.Desc
-	logger log.Logger
+	logger *logger.Logger
 }
 
 
@@ -83,7 +82,7 @@ func (cc *CPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (cc *CPUsCollector) Collect(ch chan<- prometheus.Metric) {
 	cm, err := CPUsGetMetrics(cc.logger)
 	if err != nil {
-		_ = level.Error(cc.logger).Log("msg", "Failed to get CPUs metrics", "err", err)
+		cc.logger.Error("Failed to get CPUs metrics", "err", err)
 		return
 	}
 	ch <- prometheus.MustNewConstMetric(cc.alloc, prometheus.GaugeValue, cm.alloc)

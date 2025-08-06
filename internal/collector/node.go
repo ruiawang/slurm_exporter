@@ -5,9 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 // NodeMetrics stores metrics for each node
@@ -22,7 +21,7 @@ type NodeMetrics struct {
 	partitions []string
 }
 
-func NodeGetMetrics(logger log.Logger) (map[string]*NodeMetrics, error) {
+func NodeGetMetrics(logger *logger.Logger) (map[string]*NodeMetrics, error) {
 	data, err := NodeData(logger)
 	if err != nil {
 		return nil, err
@@ -82,7 +81,7 @@ func ParseNodeMetrics(input []byte) map[string]*NodeMetrics {
 NodeData executes the sinfo command to get detailed data for each node.
 Expected sinfo output format: "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition".
 */
-func NodeData(logger log.Logger) ([]byte, error) {
+func NodeData(logger *logger.Logger) ([]byte, error) {
 	args := []string{"-h", "-N", "-O", "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition"}
 	return Execute(logger, "sinfo", args)
 }
@@ -95,11 +94,11 @@ type NodeCollector struct {
 	memAlloc   *prometheus.Desc
 	memTotal   *prometheus.Desc
 	nodeStatus *prometheus.Desc
-	logger     log.Logger
+	logger     *logger.Logger
 }
 
 
-func NewNodeCollector(logger log.Logger) *NodeCollector {
+func NewNodeCollector(logger *logger.Logger) *NodeCollector {
 	labels := []string{"node", "status", "partition"}
 	return &NodeCollector{
 		cpuAlloc:   prometheus.NewDesc("slurm_node_cpu_alloc", "Allocated CPUs per node", labels, nil),
@@ -127,7 +126,7 @@ func (nc *NodeCollector) Describe(ch chan<- *prometheus.Desc) {
 func (nc *NodeCollector) Collect(ch chan<- prometheus.Metric) {
 	nodes, err := NodeGetMetrics(nc.logger)
 	if err != nil {
-		_ = level.Error(nc.logger).Log("msg", "Failed to get node metrics", "err", err)
+		nc.logger.Error("Failed to get node metrics", "err", err)
 		return
 	}
 	for node, metrics := range nodes {

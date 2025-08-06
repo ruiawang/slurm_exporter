@@ -4,9 +4,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
+	
+	
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 type NNVal map[string]map[string]map[string]float64
@@ -38,7 +39,7 @@ type QueueMetrics struct {
 }
 
 
-func QueueGetMetrics(logger log.Logger) (*QueueMetrics, error) {
+func QueueGetMetrics(logger *logger.Logger) (*QueueMetrics, error) {
 	data, err := QueueData(logger)
 	if err != nil {
 		return nil, err
@@ -155,7 +156,7 @@ func ParseQueueMetrics(input []byte) *QueueMetrics {
 QueueData executes the squeue command to retrieve queue information.
 Expected squeue output format: "%P,%T,%C,%r,%u" (Partition,State,CPUs,Reason,User).
 */
-func QueueData(logger log.Logger) ([]byte, error) {
+func QueueData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-h", "-o", "%P,%T,%C,%r,%u"})
 }
 
@@ -165,7 +166,7 @@ func QueueData(logger log.Logger) ([]byte, error) {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 
-func NewQueueCollector(logger log.Logger) *QueueCollector {
+func NewQueueCollector(logger *logger.Logger) *QueueCollector {
 	return &QueueCollector{
 		pending:           prometheus.NewDesc("slurm_queue_pending", "Pending jobs in queue", []string{"user", "partition", "reason"}, nil),
 		running:           prometheus.NewDesc("slurm_queue_running", "Running jobs in the cluster", []string{"user", "partition"}, nil),
@@ -216,7 +217,7 @@ type QueueCollector struct {
 	cores_timeout     *prometheus.Desc
 	cores_preempted   *prometheus.Desc
 	cores_node_fail   *prometheus.Desc
-	logger            log.Logger
+	logger            *logger.Logger
 }
 
 func (qc *QueueCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -247,7 +248,7 @@ func (qc *QueueCollector) Describe(ch chan<- *prometheus.Desc) {
 func (qc *QueueCollector) Collect(ch chan<- prometheus.Metric) {
 	qm, err := QueueGetMetrics(qc.logger)
 	if err != nil {
-		_ = level.Error(qc.logger).Log("msg", "Failed to get queue metrics", "err", err)
+		qc.logger.Error("Failed to get queue metrics", "err", err)
 		return
 	}
 	for reason, values := range qm.pending {

@@ -4,16 +4,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 /*
 PartitionsData executes the sinfo command to retrieve partition CPU information.
 Expected sinfo output format: "%R,%C" (PartitionName,Alloc/Idle/Other/Total CPUs).
 */
-func PartitionsData(logger log.Logger) ([]byte, error) {
+func PartitionsData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "sinfo", []string{"-h", "-o", "%R,%C"})
 }
 
@@ -21,7 +20,7 @@ func PartitionsData(logger log.Logger) ([]byte, error) {
 PartitionsPendingJobsData executes the squeue command to retrieve pending job counts per partition.
 Expected squeue output format: "%P" (PartitionName).
 */
-func PartitionsPendingJobsData(logger log.Logger) ([]byte, error) {
+func PartitionsPendingJobsData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%P", "--states=PENDING"})
 }
 
@@ -37,7 +36,7 @@ type PartitionMetrics struct {
 ParsePartitionsMetrics parses the output of sinfo and squeue for partition metrics.
 It combines CPU allocation data from sinfo ("%R,%C") with pending job counts from squeue ("%P").
 */
-func ParsePartitionsMetrics(logger log.Logger) (map[string]*PartitionMetrics, error) {
+func ParsePartitionsMetrics(logger *logger.Logger) (map[string]*PartitionMetrics, error) {
 	partitions := make(map[string]*PartitionMetrics)
 	partitionsData, err := PartitionsData(logger)
 	if err != nil {
@@ -86,10 +85,10 @@ type PartitionsCollector struct {
 	other     *prometheus.Desc
 	pending   *prometheus.Desc
 	total     *prometheus.Desc
-	logger    log.Logger
+	logger    *logger.Logger
 }
 
-func NewPartitionsCollector(logger log.Logger) *PartitionsCollector {
+func NewPartitionsCollector(logger *logger.Logger) *PartitionsCollector {
 	labels := []string{"partition"}
 	return &PartitionsCollector{
 		allocated: prometheus.NewDesc("slurm_partition_cpus_allocated", "Allocated CPUs for partition", labels, nil),
@@ -112,7 +111,7 @@ func (pc *PartitionsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (pc *PartitionsCollector) Collect(ch chan<- prometheus.Metric) {
 	pm, err := ParsePartitionsMetrics(pc.logger)
 	if err != nil {
-		_ = level.Error(pc.logger).Log("msg", "Failed to parse partitions metrics", "err", err)
+		pc.logger.Error("Failed to parse partitions metrics", "err", err)
 		return
 	}
 	for p := range pm {

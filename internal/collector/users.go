@@ -5,16 +5,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
+	
+	
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 /*
 UsersData executes the squeue command to retrieve job information by user.
 Expected squeue output format: "%A|%u|%T|%C" (Job ID|User|State|CPUs).
 */
-func UsersData(logger log.Logger) ([]byte, error) {
+func UsersData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%A|%u|%T|%C"})
 }
 
@@ -29,7 +30,7 @@ type UserJobMetrics struct {
 ParseUsersMetrics parses the output of the squeue command for user-specific job metrics.
 It expects input in the format: "JobID|User|State|CPUs".
 */
-func ParseUsersMetrics(logger log.Logger) (map[string]*UserJobMetrics, error) {
+func ParseUsersMetrics(logger *logger.Logger) (map[string]*UserJobMetrics, error) {
 	users := make(map[string]*UserJobMetrics)
 	usersData, err := UsersData(logger)
 	if err != nil {
@@ -68,10 +69,10 @@ type UsersCollector struct {
 	running      *prometheus.Desc
 	running_cpus *prometheus.Desc
 	suspended    *prometheus.Desc
-	logger       log.Logger
+	logger       *logger.Logger
 }
 
-func NewUsersCollector(logger log.Logger) *UsersCollector {
+func NewUsersCollector(logger *logger.Logger) *UsersCollector {
 	labels := []string{"user"}
 	return &UsersCollector{
 		pending:      prometheus.NewDesc("slurm_user_jobs_pending", "Pending jobs for user", labels, nil),
@@ -92,7 +93,7 @@ func (uc *UsersCollector) Describe(ch chan<- *prometheus.Desc) {
 func (uc *UsersCollector) Collect(ch chan<- prometheus.Metric) {
 	um, err := ParseUsersMetrics(uc.logger)
 	if err != nil {
-		_ = level.Error(uc.logger).Log("msg", "Failed to parse users metrics", "err", err)
+		uc.logger.Error("Failed to parse users metrics", "err", err)
 		return
 	}
 	for u := range um {

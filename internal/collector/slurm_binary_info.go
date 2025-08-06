@@ -3,19 +3,20 @@ package collector
 import (
 	"strings"
 
-	"github.com/go-kit/log"
+	
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 // SlurmInfoCollector defines a Prometheus collector for Slurm binary and version information
 type SlurmInfoCollector struct {
 	slurmInfo *prometheus.Desc
 	binaries  []string
-	logger    log.Logger
+	logger    *logger.Logger
 }
 
 
-func NewSlurmInfoCollector(logger log.Logger) *SlurmInfoCollector {
+func NewSlurmInfoCollector(logger *logger.Logger) *SlurmInfoCollector {
 	binaries := []string{
 		"sinfo", "squeue", "sdiag", "scontrol",
 		"sacct", "sbatch", "salloc", "srun",
@@ -56,7 +57,7 @@ func (c *SlurmInfoCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 
-func GetBinaryVersion(logger log.Logger, binary string) (string, bool) {
+func GetBinaryVersion(logger *logger.Logger, binary string) (string, bool) {
 	output, err := Execute(logger, binary, []string{"--version"})
 	if err != nil {
 		// The Execute function already logs the error, so we just return.
