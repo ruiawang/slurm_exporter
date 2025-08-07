@@ -32,17 +32,17 @@ import (
 )
 
 var (
-	// Flags for command-line configuration
+	// Command-line flags for application configuration
 	commandTimeout = kingpin.Flag("command.timeout", "Timeout for executing Slurm commands.").Default("5s").Duration()
 	logLevel       = kingpin.Flag("log.level", "Only log messages with the given severity or above. One of: [debug, info, warn, error]").Default("info").Enum("debug", "info", "warn", "error")
 	logFormat      = kingpin.Flag("log.format", "Log format. One of: [json, text]").Default("text").Enum("json", "text")
 	toolkitFlags   = webflag.AddFlags(kingpin.CommandLine, ":9341")
 
-	// Map to store the state of collectors
+	// collectorState stores the enabled/disabled state of each collector
 	collectorState = make(map[string]*bool)
 )
 
-// Map of collector constructors
+// collectorConstructors maps collector names to their constructor functions
 var collectorConstructors = map[string]func(logger *logger.Logger) prometheus.Collector{
 	"accounts":     func(l *logger.Logger) prometheus.Collector { return collector.NewAccountsCollector(l) },
 	"cpus":         func(l *logger.Logger) prometheus.Collector { return collector.NewCPUsCollector(l) },
@@ -58,7 +58,7 @@ var collectorConstructors = map[string]func(logger *logger.Logger) prometheus.Co
 	"reservations": func(l *logger.Logger) prometheus.Collector { return collector.NewReservationsCollector(l) },
 }
 
-// Message to display on the root page
+// indexHTML is the HTML content displayed on the root page
 const indexHTML = `<html>
 	<head><title>Slurm Exporter</title></head>
 	<body>
@@ -67,6 +67,7 @@ const indexHTML = `<html>
 	</body>
 </html>`
 
+// registerCollectors registers enabled collectors with Prometheus
 func registerCollectors(logger *logger.Logger) {
 	for name, constructor := range collectorConstructors {
 		if *collectorState[name] {
@@ -79,16 +80,17 @@ func registerCollectors(logger *logger.Logger) {
 }
 
 func main() {
-	// Dynamically create flags for each collector
+	// Dynamically create command-line flags for each collector
 	for name := range collectorConstructors {
 		collectorState[name] = kingpin.Flag("collector."+name, "Enable the "+name+" collector.").Default("true").Bool()
 	}
 
+	// Configure kingpin command-line parser
 	kingpin.Version(version.Print("slurm_exporter"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	// Setup logger with the configured level and format
+	// Initialize logger based on configured format and level
 	var log *logger.Logger
 	if *logFormat == "json" {
 		log = logger.NewJSONLogger(*logLevel)
@@ -96,34 +98,30 @@ func main() {
 		log = logger.NewTextLogger(*logLevel)
 	}
 
-	// Set the command timeout for the collector package.
+	// Configure global command timeout for all collectors
 	collector.SetCommandTimeout(*commandTimeout)
 
-	// Register version metrics
+	// Register Prometheus build info collector
 	prometheus.MustRegister(collectors.NewBuildInfoCollector())
 
-	// Register collectors based on flags
+	// Register enabled Slurm collectors
 	registerCollectors(log)
 
-	// Log server startup details
-	log.Info("Starting Server...")
-	log.Info("Command timeout set", "timeout", *commandTimeout)
+	// Log server startup information
+	log.Info("Starting Slurm Exporter server...")
+	log.Info("Command timeout configured", "timeout", *commandTimeout)
 
-	// Define the root handler for '/'
+	// Configure HTTP routes
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(indexHTML))
 	})
-
-	// Expose /metrics endpoint
 	http.Handle("/metrics", promhttp.Handler())
 
-	// Create the HTTP server
+	// Start HTTP server with exporter toolkit (supports TLS, Basic Auth, etc.)
 	server := &http.Server{}
-
-	// Use exporter toolkit to start the server (supports TLS, Basic Auth, etc.)
 	if err := web.ListenAndServe(server, toolkitFlags, log); err != nil {
-		log.Error("Error starting HTTP server", "err", err)
+		log.Error("Failed to start HTTP server", "err", err)
 		os.Exit(1)
 	}
 }

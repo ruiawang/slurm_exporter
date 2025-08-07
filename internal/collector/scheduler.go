@@ -5,200 +5,194 @@ import (
 	"strconv"
 	"strings"
 
-	
-	
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
-/*
- * Execute the Slurm sdiag command to read the current statistics
- * from the Slurm scheduler. It will be repreatedly called by the
- * collector.
- */
-
-// Basic metrics for the scheduler
+// SchedulerMetrics holds performance statistics from the Slurm scheduler daemon
 type SchedulerMetrics struct {
-	threads                           float64
-	queue_size                        float64
-	dbd_queue_size                    float64
-	last_cycle                        float64
-	mean_cycle                        float64
-	cycle_per_minute                  float64
-	backfill_last_cycle               float64
-	backfill_mean_cycle               float64
-	backfill_depth_mean               float64
-	total_backfilled_jobs_since_start float64
-	total_backfilled_jobs_since_cycle float64
-	total_backfilled_heterogeneous    float64
-	rpc_stats_count                   map[string]float64
-	rpc_stats_avg_time                map[string]float64
-	rpc_stats_total_time              map[string]float64
-	user_rpc_stats_count              map[string]float64
-	user_rpc_stats_avg_time           map[string]float64
-	user_rpc_stats_total_time         map[string]float64
+	threads                           float64            // Number of scheduler threads
+	queue_size                        float64            // Length of the scheduler queue
+	dbd_queue_size                    float64            // Length of the DBD agent queue
+	last_cycle                        float64            // Last scheduler cycle time (microseconds)
+	mean_cycle                        float64            // Mean scheduler cycle time (microseconds)
+	cycle_per_minute                  float64            // Number of scheduler cycles per minute
+	backfill_last_cycle               float64            // Last backfill cycle time (microseconds)
+	backfill_mean_cycle               float64            // Mean backfill cycle time (microseconds)
+	backfill_depth_mean               float64            // Mean backfill depth
+	total_backfilled_jobs_since_start float64            // Total backfilled jobs since Slurm start
+	total_backfilled_jobs_since_cycle float64            // Total backfilled jobs since stats cycle start
+	total_backfilled_heterogeneous    float64            // Total backfilled heterogeneous job components
+	rpc_stats_count                   map[string]float64 // RPC call counts by operation
+	rpc_stats_avg_time                map[string]float64 // RPC average times by operation
+	rpc_stats_total_time              map[string]float64 // RPC total times by operation
+	user_rpc_stats_count              map[string]float64 // RPC call counts by user
+	user_rpc_stats_avg_time           map[string]float64 // RPC average times by user
+	user_rpc_stats_total_time         map[string]float64 // RPC total times by user
 }
 
-
-/*
-SchedulerData executes the sdiag command to retrieve scheduler statistics.
-Expected sdiag output format: various key:value pairs and RPC statistics sections.
-*/
+// SchedulerData executes the sdiag command to retrieve scheduler statistics
 func SchedulerData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "sdiag", nil)
 }
 
-
-/*
-ParseSchedulerMetrics parses the output of the sdiag command.
-It extracts various scheduler metrics, handling specific repetitions for 'Last cycle' and 'Mean cycle'.
-*/
+// ParseSchedulerMetrics parses the output of the sdiag command
+// It handles the fact that 'Last cycle' and 'Mean cycle' appear twice in sdiag output
+// (once for main scheduler, once for backfill scheduler)
 func ParseSchedulerMetrics(input []byte) *SchedulerMetrics {
 	var sm SchedulerMetrics
 	lines := strings.Split(string(input), "\n")
-	// Guard variables to check for string repetitions in the output of sdiag
-	// (two occurencies of the following strings: 'Last cycle', 'Mean cycle')
-	lc_count := 0
-	mc_count := 0
+
+	// Counters to handle duplicate metric names in sdiag output
+	lastCycleCount := 0
+	meanCycleCount := 0
+	// Define regex patterns for matching sdiag output lines
+	patterns := map[string]*regexp.Regexp{
+		"threads":     regexp.MustCompile(`^Server thread`),
+		"queue":       regexp.MustCompile(`^Agent queue`),
+		"dbd":         regexp.MustCompile(`^DBD Agent`),
+		"lastCycle":   regexp.MustCompile(`^[\s]+Last cycle$`),
+		"meanCycle":   regexp.MustCompile(`^[\s]+Mean cycle$`),
+		"cyclesPer":   regexp.MustCompile(`^[\s]+Cycles per`),
+		"depthMean":   regexp.MustCompile(`^[\s]+Depth Mean$`),
+		"totalStart":  regexp.MustCompile(`^[\s]+Total backfilled jobs \(since last slurm start\)`),
+		"totalCycle":  regexp.MustCompile(`^[\s]+Total backfilled jobs \(since last stats cycle start\)`),
+		"totalHetero": regexp.MustCompile(`^[\s]+Total backfilled heterogeneous job components`),
+	}
+
 	for _, line := range lines {
-		if strings.Contains(line, ":") {
-			state := strings.Split(line, ":")[0]
-			st := regexp.MustCompile(`^Server thread`)
-			qs := regexp.MustCompile(`^Agent queue`)
-			dbd := regexp.MustCompile(`^DBD Agent`)
-			lc := regexp.MustCompile(`^[\s]+Last cycle$`)
-			mc := regexp.MustCompile(`^[\s]+Mean cycle$`)
-			cpm := regexp.MustCompile(`^[\s]+Cycles per`)
-			dpm := regexp.MustCompile(`^[\s]+Depth Mean$`)
-			tbs := regexp.MustCompile(`^[\s]+Total backfilled jobs \(since last slurm start\)`)
-			tbc := regexp.MustCompile(`^[\s]+Total backfilled jobs \(since last stats cycle start\)`)
-			tbh := regexp.MustCompile(`^[\s]+Total backfilled heterogeneous job components`)
-			switch {
-			case st.MatchString(state):
-				sm.threads, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case qs.MatchString(state):
-				sm.queue_size, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case dbd.MatchString(state):
-				sm.dbd_queue_size, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case lc.MatchString(state):
-				if lc_count == 0 {
-					sm.last_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-					lc_count = 1
-				}
-				if lc_count == 1 {
-					sm.backfill_last_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-				}
-			case mc.MatchString(state):
-				if mc_count == 0 {
-					sm.mean_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-					mc_count = 1
-				}
-				if mc_count == 1 {
-					sm.backfill_mean_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-				}
-			case cpm.MatchString(state):
-				sm.cycle_per_minute, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case dpm.MatchString(state):
-				sm.backfill_depth_mean, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case tbs.MatchString(state):
-				sm.total_backfilled_jobs_since_start, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case tbc.MatchString(state):
-				sm.total_backfilled_jobs_since_cycle, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
-			case tbh.MatchString(state):
-				sm.total_backfilled_heterogeneous, _ = strconv.ParseFloat(strings.TrimSpace(strings.Split(line, ":")[1]), 64)
+		if !strings.Contains(line, ":") {
+			continue
+		}
+
+		parts := strings.Split(line, ":")
+		if len(parts) < 2 {
+			continue
+		}
+
+		key := parts[0]
+		value := strings.TrimSpace(parts[1])
+		floatValue, _ := strconv.ParseFloat(value, 64)
+
+		switch {
+		case patterns["threads"].MatchString(key):
+			sm.threads = floatValue
+		case patterns["queue"].MatchString(key):
+			sm.queue_size = floatValue
+		case patterns["dbd"].MatchString(key):
+			sm.dbd_queue_size = floatValue
+		case patterns["lastCycle"].MatchString(key):
+			if lastCycleCount == 0 {
+				sm.last_cycle = floatValue
+				lastCycleCount++
+			} else {
+				sm.backfill_last_cycle = floatValue
 			}
+		case patterns["meanCycle"].MatchString(key):
+			if meanCycleCount == 0 {
+				sm.mean_cycle = floatValue
+				meanCycleCount++
+			} else {
+				sm.backfill_mean_cycle = floatValue
+			}
+		case patterns["cyclesPer"].MatchString(key):
+			sm.cycle_per_minute = floatValue
+		case patterns["depthMean"].MatchString(key):
+			sm.backfill_depth_mean = floatValue
+		case patterns["totalStart"].MatchString(key):
+			sm.total_backfilled_jobs_since_start = floatValue
+		case patterns["totalCycle"].MatchString(key):
+			sm.total_backfilled_jobs_since_cycle = floatValue
+		case patterns["totalHetero"].MatchString(key):
+			sm.total_backfilled_heterogeneous = floatValue
 		}
 	}
-	rpc_stats := ParseRpcStats(lines)
-	sm.rpc_stats_count = rpc_stats[0]
-	sm.rpc_stats_avg_time = rpc_stats[1]
-	sm.rpc_stats_total_time = rpc_stats[2]
-	sm.user_rpc_stats_count = rpc_stats[3]
-	sm.user_rpc_stats_avg_time = rpc_stats[4]
-	sm.user_rpc_stats_total_time = rpc_stats[5]
+
+	// Parse RPC statistics sections
+	rpcStats := ParseRpcStats(lines)
+	sm.rpc_stats_count = rpcStats[0]
+	sm.rpc_stats_avg_time = rpcStats[1]
+	sm.rpc_stats_total_time = rpcStats[2]
+	sm.user_rpc_stats_count = rpcStats[3]
+	sm.user_rpc_stats_avg_time = rpcStats[4]
+	sm.user_rpc_stats_total_time = rpcStats[5]
+
 	return &sm
 }
 
-
-/*
-SplitColonValueToFloat extracts a float64 value from a string in "key: value" format.
-Returns 0 if the format is not as expected.
-*/
+// SplitColonValueToFloat extracts a float64 value from a "key: value" formatted string
 func SplitColonValueToFloat(input string) float64 {
-	str := strings.Split(input, ":")
-	if len(str) == 1 {
+	parts := strings.Split(input, ":")
+	if len(parts) < 2 {
 		return 0
-	} else {
-		rvalue := strings.TrimSpace(str[1])
-		flt, _ := strconv.ParseFloat(rvalue, 64)
-		return flt
 	}
+	value := strings.TrimSpace(parts[1])
+	result, _ := strconv.ParseFloat(value, 64)
+	return result
 }
 
-
-/*
-ParseRpcStats parses the RPC statistics sections from sdiag output.
-It identifies and extracts RPC counts, average times, and total times for both message types and users.
-*/
+// ParseRpcStats parses RPC statistics sections from sdiag output
+// Returns slice of maps: [count_stats, avg_stats, total_stats, user_count_stats, user_avg_stats, user_total_stats]
 func ParseRpcStats(lines []string) []map[string]float64 {
-	var in_rpc bool
-	var in_rpc_per_user bool
-	var count_stats map[string]float64
-	var avg_stats map[string]float64
-	var total_stats map[string]float64
-	var user_count_stats map[string]float64
-	var user_avg_stats map[string]float64
-	var user_total_stats map[string]float64
+	// Initialize result maps
+	countStats := make(map[string]float64)
+	avgStats := make(map[string]float64)
+	totalStats := make(map[string]float64)
+	userCountStats := make(map[string]float64)
+	userAvgStats := make(map[string]float64)
+	userTotalStats := make(map[string]float64)
 
-	count_stats = make(map[string]float64)
-	avg_stats = make(map[string]float64)
-	total_stats = make(map[string]float64)
-	user_count_stats = make(map[string]float64)
-	user_avg_stats = make(map[string]float64)
-	user_total_stats = make(map[string]float64)
+	// State tracking for parsing sections
+	inRPC := false
+	inRPCPerUser := false
 
-	in_rpc = false
-	in_rpc_per_user = false
-
-	stat_line_re := regexp.MustCompile(`^\s*([A-Za-z0-9_]*).*count:([0-9]*)\s*ave_time:([0-9]*)\s\s*total_time:([0-9]*)\s*$`)
+	// Regex to match RPC statistics lines
+	statLineRe := regexp.MustCompile(`^\s*([A-Za-z0-9_]*).*count:([0-9]*)\s*ave_time:([0-9]*)\s\s*total_time:([0-9]*)\s*$`)
 
 	for _, line := range lines {
+		// Detect section transitions
 		if strings.Contains(line, "Remote Procedure Call statistics by message type") {
-			in_rpc = true
-			in_rpc_per_user = false
+			inRPC = true
+			inRPCPerUser = false
 		} else if strings.Contains(line, "Remote Procedure Call statistics by user") {
-			in_rpc = false
-			in_rpc_per_user = true
+			inRPC = false
+			inRPCPerUser = true
 		}
-		if in_rpc || in_rpc_per_user {
-			re_match := stat_line_re.FindAllStringSubmatch(line, -1)
-			if re_match != nil {
-				re_match_first := re_match[0]
-				if in_rpc {
-					count_stats[re_match_first[1]], _ = strconv.ParseFloat(re_match_first[2], 64)
-					avg_stats[re_match_first[1]], _ = strconv.ParseFloat(re_match_first[3], 64)
-					total_stats[re_match_first[1]], _ = strconv.ParseFloat(re_match_first[4], 64)
-				} else if in_rpc_per_user {
-					user_count_stats[re_match_first[1]], _ = strconv.ParseFloat(re_match_first[2], 64)
-					user_avg_stats[re_match_first[1]], _ = strconv.ParseFloat(re_match_first[3], 64)
-					user_total_stats[re_match_first[1]], _ = strconv.ParseFloat(re_match_first[4], 64)
+
+		// Parse statistics lines in current section
+		if inRPC || inRPCPerUser {
+			matches := statLineRe.FindAllStringSubmatch(line, -1)
+			if matches != nil && len(matches[0]) >= 5 {
+				match := matches[0]
+				name := match[1]
+				count, _ := strconv.ParseFloat(match[2], 64)
+				avgTime, _ := strconv.ParseFloat(match[3], 64)
+				totalTime, _ := strconv.ParseFloat(match[4], 64)
+
+				if inRPC {
+					countStats[name] = count
+					avgStats[name] = avgTime
+					totalStats[name] = totalTime
+				} else if inRPCPerUser {
+					userCountStats[name] = count
+					userAvgStats[name] = avgTime
+					userTotalStats[name] = totalTime
 				}
 			}
 		}
 	}
 
-	rpc_stats_final := []map[string]float64{
-		count_stats,
-		avg_stats,
-		total_stats,
-		user_count_stats,
-		user_avg_stats,
-		user_total_stats,
+	return []map[string]float64{
+		countStats,
+		avgStats,
+		totalStats,
+		userCountStats,
+		userAvgStats,
+		userTotalStats,
 	}
-	return rpc_stats_final
 }
 
-
+// SchedulerGetMetrics retrieves and parses scheduler metrics from Slurm
 func SchedulerGetMetrics(logger *logger.Logger) (*SchedulerMetrics, error) {
 	data, err := SchedulerData(logger)
 	if err != nil {
@@ -207,13 +201,7 @@ func SchedulerGetMetrics(logger *logger.Logger) (*SchedulerMetrics, error) {
 	return ParseSchedulerMetrics(data), nil
 }
 
-/*
- * Implement the Prometheus Collector interface and feed the
- * Slurm scheduler metrics into it.
- * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
- */
-
-
+// SchedulerCollector implements the Prometheus Collector interface for scheduler metrics
 type SchedulerCollector struct {
 	threads                           *prometheus.Desc
 	queue_size                        *prometheus.Desc
@@ -236,7 +224,6 @@ type SchedulerCollector struct {
 	logger                            *logger.Logger
 }
 
-
 func (c *SchedulerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.threads
 	ch <- c.queue_size
@@ -257,7 +244,6 @@ func (c *SchedulerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.user_rpc_stats_avg_time
 	ch <- c.user_rpc_stats_total_time
 }
-
 
 func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
 	sm, err := SchedulerGetMetrics(sc.logger)
@@ -297,7 +283,6 @@ func (sc *SchedulerCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 }
-
 
 func NewSchedulerCollector(logger *logger.Logger) *SchedulerCollector {
 	rpc_stats_labels := make([]string, 0, 1)

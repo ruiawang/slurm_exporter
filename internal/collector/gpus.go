@@ -9,205 +9,204 @@ import (
 	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
+// GPUsMetrics holds GPU utilization statistics from Slurm
 type GPUsMetrics struct {
-	alloc       float64
-	idle        float64
-	other       float64
-	total       float64
-	utilization float64
+	alloc       float64 // Number of allocated GPUs
+	idle        float64 // Number of idle GPUs
+	other       float64 // Number of GPUs in other states (mixed, down, etc.)
+	total       float64 // Total number of GPUs in the cluster
+	utilization float64 // GPU utilization ratio (allocated/total)
 }
 
+// GPUsGetMetrics retrieves and parses GPU metrics from Slurm
 func GPUsGetMetrics(logger *logger.Logger) (*GPUsMetrics, error) {
 	return ParseGPUsMetrics(logger)
 }
 
-
-
+// ParseAllocatedGPUs parses the output of sinfo command to count allocated GPUs
+// Expected input format examples:
+//   - slurm>=20.11.8: "3 gpu:2"
+//   - slurm 21.08.5:  "1 gpu:(null):3(IDX:0-7)"
+//   - slurm 21.08.5:  "13 gpu:A30:4(IDX:0-3),gpu:Q6K:4(IDX:0-3)"
 func ParseAllocatedGPUs(data []byte) float64 {
-	var num_gpus = 0.0
-	// sinfo -a -h --Format="Nodes: ,GresUsed:" --state=allocated
-	// 3 gpu:2                                       # slurm>=20.11.8
-	// 1 gpu:(null):3(IDX:0-7)                       # slurm 21.08.5
-	// 13 gpu:A30:4(IDX:0-3),gpu:Q6K:4(IDX:0-3)      # slurm 21.08.5
-
-	sinfo_lines := string(data)
+	var numGPUs = 0.0
+	sinfoLines := string(data)
+	// Regex to match GPU specifications: gpu:type:count or gpu:count
 	re := regexp.MustCompile(`gpu:(\(null\)|[^:(]*):?([0-9]+)(\([^)]*\))?`)
-	if len(sinfo_lines) > 0 {
-		for _, line := range strings.Split(sinfo_lines, "\n") {
-
-			if len(line) > 0 && strings.Contains(line, "gpu:") {
-				nodes := strings.Fields(line)[0]
-				num_nodes, _ := strconv.ParseFloat(nodes, 64)
-				node_active_gpus := strings.Fields(line)[1]
-				num_node_active_gpus := 0.0
-				for _, node_active_gpus_type := range strings.Split(node_active_gpus, ",") {
-					if strings.Contains(node_active_gpus_type, "gpu:") {
-						node_active_gpus_type = re.FindStringSubmatch(node_active_gpus_type)[2]
-						num_node_active_gpus_type, _ := strconv.ParseFloat(node_active_gpus_type, 64)
-						num_node_active_gpus += num_node_active_gpus_type
-					}
-				}
-				num_gpus += num_nodes * num_node_active_gpus
-			}
-		}
-	}
-
-	return num_gpus
-}
-
-func ParseIdleGPUs(data []byte) float64 {
-	var num_gpus = 0.0
-	// sinfo -a -h --Format="Nodes: ,Gres: ,GresUsed:" --state=idle,allocated
-	// 3 gpu:4 gpu:2                                       												# slurm 20.11.8
-	// 1 gpu:8(S:0-1) gpu:(null):3(IDX:0-7)                       												# slurm 21.08.5
-	// 13 gpu:A30:4(S:0-1),gpu:Q6K:40(S:0-1) gpu:A30:4(IDX:0-3),gpu:Q6K:4(IDX:0-3)       	# slurm 21.08.5
-
-	sinfo_lines := string(data)
-	re := regexp.MustCompile(`gpu:(\(null\)|[^:(]*):?([0-9]+)(\([^)]*\))?`)
-	if len(sinfo_lines) > 0 {
-		for _, line := range strings.Split(sinfo_lines, "\n") {
-
+	if len(sinfoLines) > 0 {
+		for _, line := range strings.Split(sinfoLines, "\n") {
 			if len(line) > 0 && strings.Contains(line, "gpu:") {
 				fields := strings.Fields(line)
-				nodes := fields[0]
-				num_nodes, _ := strconv.ParseFloat(nodes, 64)
-
-				if len(fields) == 1 {
-					// Case where only one column is present, assume it's allocated GPUs
-					num_gpus += 0 // No idle GPUs in this case
-				} else if len(fields) == 2 {
-					// Case where two columns are present
-					node_gpus_str := fields[1]
-					num_node_gpus := 0.0
-					for _, node_gpus_type := range strings.Split(node_gpus_str, ",") {
-						if strings.Contains(node_gpus_type, "gpu:") {
-							submatch := re.FindStringSubmatch(node_gpus_type)
-							if len(submatch) > 2 {
-								gpu_count, _ := strconv.ParseFloat(submatch[2], 64)
-								num_node_gpus += gpu_count
-							}
-						}
-					}
-					num_gpus += num_nodes * num_node_gpus
-				} else if len(fields) >= 3 {
-					// Original case with three or more columns
-					node_gpus_str := fields[1]
-					num_node_gpus := 0.0
-					for _, node_gpus_type := range strings.Split(node_gpus_str, ",") {
-						if strings.Contains(node_gpus_type, "gpu:") {
-							submatch := re.FindStringSubmatch(node_gpus_type)
-							if len(submatch) > 2 {
-								gpu_count, _ := strconv.ParseFloat(submatch[2], 64)
-								num_node_gpus += gpu_count
-							}
-						}
-					}
-
-					active_gpus_str := fields[2]
-					num_node_active_gpus := 0.0
-					for _, node_active_gpus_type := range strings.Split(active_gpus_str, ",") {
-						if strings.Contains(node_active_gpus_type, "gpu:") {
-							submatch := re.FindStringSubmatch(node_active_gpus_type)
-							if len(submatch) > 2 {
-								gpu_count, _ := strconv.ParseFloat(submatch[2], 64)
-								num_node_active_gpus += gpu_count
-							}
-						}
-					}
-					num_gpus += num_nodes * (num_node_gpus - num_node_active_gpus)
+				if len(fields) < 2 {
+					continue
 				}
+
+				numNodes, _ := strconv.ParseFloat(fields[0], 64)
+				nodeActiveGPUs := fields[1]
+				numNodeActiveGPUs := 0.0
+
+				// Parse GPU specifications separated by commas
+				for _, gpuSpec := range strings.Split(nodeActiveGPUs, ",") {
+					if strings.Contains(gpuSpec, "gpu:") {
+						matches := re.FindStringSubmatch(gpuSpec)
+						if len(matches) > 2 {
+							gpuCount, _ := strconv.ParseFloat(matches[2], 64)
+							numNodeActiveGPUs += gpuCount
+						}
+					}
+				}
+				numGPUs += numNodes * numNodeActiveGPUs
 			}
 		}
 	}
 
-	return num_gpus
+	return numGPUs
 }
 
-func ParseTotalGPUs(data []byte) float64 {
-	var num_gpus = 0.0
-	// sinfo -a -h --Format="Nodes: ,Gres:"
-	// 3 gpu:4                                       	# slurm 20.11.8
-	// 1 gpu:8(S:0-1)                                	# slurm 21.08.5
-	// 13 gpu:A30:4(S:0-1),gpu:Q6K:40(S:0-1)        	# slurm 21.08.5
-
-	sinfo_lines := string(data)
+// ParseIdleGPUs calculates idle GPUs by subtracting allocated from total GPUs
+// Expected input format examples:
+//   - slurm 20.11.8:  "3 gpu:4 gpu:2" (total available, allocated)
+//   - slurm 21.08.5:  "1 gpu:8(S:0-1) gpu:(null):3(IDX:0-7)"
+//   - slurm 21.08.5:  "13 gpu:A30:4(S:0-1),gpu:Q6K:40(S:0-1) gpu:A30:4(IDX:0-3),gpu:Q6K:4(IDX:0-3)"
+func ParseIdleGPUs(data []byte) float64 {
+	var numGPUs = 0.0
+	sinfoLines := string(data)
 	re := regexp.MustCompile(`gpu:(\(null\)|[^:(]*):?([0-9]+)(\([^)]*\))?`)
-	if len(sinfo_lines) > 0 {
-		for _, line := range strings.Split(sinfo_lines, "\n") {
-			
+	if len(sinfoLines) > 0 {
+		for _, line := range strings.Split(sinfoLines, "\n") {
 			if len(line) > 0 && strings.Contains(line, "gpu:") {
-				nodes := strings.Fields(line)[0]
-				num_nodes, _ := strconv.ParseFloat(nodes, 64)
-				node_gpus := strings.Fields(line)[1]
-				num_node_gpus := 0.0
-				for _, node_gpus_type := range strings.Split(node_gpus, ",") {
-					if strings.Contains(node_gpus_type, "gpu:") {
-						node_gpus_type = re.FindStringSubmatch(node_gpus_type)[2]
-						num_node_gpus_type, _ := strconv.ParseFloat(node_gpus_type, 64)
-						num_node_gpus += num_node_gpus_type
-					}
+				fields := strings.Fields(line)
+				if len(fields) < 1 {
+					continue
 				}
-				num_gpus += num_nodes * num_node_gpus
+
+				numNodes, _ := strconv.ParseFloat(fields[0], 64)
+
+				switch len(fields) {
+				case 1:
+					// Only node count, no GPU info - assume no idle GPUs
+					numGPUs += 0
+				case 2:
+					// Two columns: nodes and total GPUs (no allocated info)
+					totalGPUs := parseGPUCount(fields[1], re)
+					numGPUs += numNodes * totalGPUs
+				default:
+					// Three or more columns: nodes, total GPUs, allocated GPUs
+					totalGPUs := parseGPUCount(fields[1], re)
+					allocatedGPUs := parseGPUCount(fields[2], re)
+					idleGPUs := totalGPUs - allocatedGPUs
+					numGPUs += numNodes * idleGPUs
+				}
 			}
 		}
 	}
 
-	return num_gpus
+	return numGPUs
 }
 
+// parseGPUCount extracts the total GPU count from a GPU specification string
+func parseGPUCount(gpuSpec string, re *regexp.Regexp) float64 {
+	var count = 0.0
+	for _, spec := range strings.Split(gpuSpec, ",") {
+		if strings.Contains(spec, "gpu:") {
+			matches := re.FindStringSubmatch(spec)
+			if len(matches) > 2 {
+				gpuCount, _ := strconv.ParseFloat(matches[2], 64)
+				count += gpuCount
+			}
+		}
+	}
+	return count
+}
+
+// ParseTotalGPUs parses the output of sinfo command to count total available GPUs
+// Expected input format examples:
+//   - slurm 20.11.8:  "3 gpu:4"
+//   - slurm 21.08.5:  "1 gpu:8(S:0-1)"
+//   - slurm 21.08.5:  "13 gpu:A30:4(S:0-1),gpu:Q6K:40(S:0-1)"
+func ParseTotalGPUs(data []byte) float64 {
+	var numGPUs = 0.0
+	sinfoLines := string(data)
+	re := regexp.MustCompile(`gpu:(\(null\)|[^:(]*):?([0-9]+)(\([^)]*\))?`)
+
+	if len(sinfoLines) > 0 {
+		for _, line := range strings.Split(sinfoLines, "\n") {
+			if len(line) > 0 && strings.Contains(line, "gpu:") {
+				fields := strings.Fields(line)
+				if len(fields) < 2 {
+					continue
+				}
+
+				numNodes, _ := strconv.ParseFloat(fields[0], 64)
+				nodeGPUs := parseGPUCount(fields[1], re)
+				numGPUs += numNodes * nodeGPUs
+			}
+		}
+	}
+
+	return numGPUs
+}
+
+// ParseGPUsMetrics collects and parses all GPU metrics from Slurm
 func ParseGPUsMetrics(logger *logger.Logger) (*GPUsMetrics, error) {
 	var gm GPUsMetrics
+
+	// Get total GPU count
 	totalGPUsData, err := TotalGPUsData(logger)
 	if err != nil {
 		return nil, err
 	}
-	total_gpus := ParseTotalGPUs(totalGPUsData)
+	totalGPUs := ParseTotalGPUs(totalGPUsData)
 
+	// Get allocated GPU count
 	allocatedGPUsData, err := AllocatedGPUsData(logger)
 	if err != nil {
 		return nil, err
 	}
-	allocated_gpus := ParseAllocatedGPUs(allocatedGPUsData)
+	allocatedGPUs := ParseAllocatedGPUs(allocatedGPUsData)
 
+	// Get idle GPU count
 	idleGPUsData, err := IdleGPUsData(logger)
 	if err != nil {
 		return nil, err
 	}
-	idle_gpus := ParseIdleGPUs(idleGPUsData)
+	idleGPUs := ParseIdleGPUs(idleGPUsData)
 
-	other_gpus := total_gpus - allocated_gpus - idle_gpus
-	gm.alloc = allocated_gpus
-	gm.idle = idle_gpus
-	gm.other = other_gpus
-	gm.total = total_gpus
-	if total_gpus > 0 {
-		gm.utilization = allocated_gpus / total_gpus
+	// Calculate other GPUs (mixed, down, etc.)
+	otherGPUs := totalGPUs - allocatedGPUs - idleGPUs
+
+	gm.alloc = allocatedGPUs
+	gm.idle = idleGPUs
+	gm.other = otherGPUs
+	gm.total = totalGPUs
+
+	// Calculate utilization ratio
+	if totalGPUs > 0 {
+		gm.utilization = allocatedGPUs / totalGPUs
 	}
+
 	return &gm, nil
 }
 
+// AllocatedGPUsData executes sinfo command to get allocated GPU information
 func AllocatedGPUsData(logger *logger.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,GresUsed:", "--state=allocated"}
 	return Execute(logger, "sinfo", args)
 }
 
+// IdleGPUsData executes sinfo command to get idle and allocated GPU information
 func IdleGPUsData(logger *logger.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,Gres: ,GresUsed:", "--state=idle,allocated"}
 	return Execute(logger, "sinfo", args)
 }
 
+// TotalGPUsData executes sinfo command to get total GPU information
 func TotalGPUsData(logger *logger.Logger) ([]byte, error) {
 	args := []string{"-a", "-h", "--Format=Nodes: ,Gres:"}
 	return Execute(logger, "sinfo", args)
 }
 
-
-/*
- * Implement the Prometheus Collector interface and feed the
- * Slurm scheduler metrics into it.
- * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
- */
-
+// NewGPUsCollector creates a new GPU metrics collector
 func NewGPUsCollector(logger *logger.Logger) *GPUsCollector {
 	return &GPUsCollector{
 		alloc:       prometheus.NewDesc("slurm_gpus_alloc", "Allocated GPUs", nil, nil),
@@ -219,6 +218,7 @@ func NewGPUsCollector(logger *logger.Logger) *GPUsCollector {
 	}
 }
 
+// GPUsCollector implements the Prometheus Collector interface for GPU metrics
 type GPUsCollector struct {
 	alloc       *prometheus.Desc
 	idle        *prometheus.Desc
@@ -228,7 +228,7 @@ type GPUsCollector struct {
 	logger      *logger.Logger
 }
 
-
+// Describe sends the descriptors of each metric over to the provided channel
 func (cc *GPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- cc.alloc
 	ch <- cc.idle
@@ -236,15 +236,18 @@ func (cc *GPUsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- cc.total
 	ch <- cc.utilization
 }
+
+// Collect fetches the GPU metrics from Slurm and sends them to Prometheus
 func (cc *GPUsCollector) Collect(ch chan<- prometheus.Metric) {
-	cm, err := GPUsGetMetrics(cc.logger)
+	metrics, err := GPUsGetMetrics(cc.logger)
 	if err != nil {
-		cc.logger.Error("Failed to get GPUs metrics", "err", err)
+		cc.logger.Error("Failed to get GPU metrics", "err", err)
 		return
 	}
-	ch <- prometheus.MustNewConstMetric(cc.alloc, prometheus.GaugeValue, cm.alloc)
-	ch <- prometheus.MustNewConstMetric(cc.idle, prometheus.GaugeValue, cm.idle)
-	ch <- prometheus.MustNewConstMetric(cc.other, prometheus.GaugeValue, cm.other)
-	ch <- prometheus.MustNewConstMetric(cc.total, prometheus.GaugeValue, cm.total)
-	ch <- prometheus.MustNewConstMetric(cc.utilization, prometheus.GaugeValue, cm.utilization)
+
+	ch <- prometheus.MustNewConstMetric(cc.alloc, prometheus.GaugeValue, metrics.alloc)
+	ch <- prometheus.MustNewConstMetric(cc.idle, prometheus.GaugeValue, metrics.idle)
+	ch <- prometheus.MustNewConstMetric(cc.other, prometheus.GaugeValue, metrics.other)
+	ch <- prometheus.MustNewConstMetric(cc.total, prometheus.GaugeValue, metrics.total)
+	ch <- prometheus.MustNewConstMetric(cc.utilization, prometheus.GaugeValue, metrics.utilization)
 }
