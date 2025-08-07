@@ -9,7 +9,7 @@ import (
 )
 
 func TestParseReservations(t *testing.T) {
-	data, err := os.ReadFile("../test_data/sreservations.txt")
+	data, err := os.ReadFile("../../test_data/sreservations.txt")
 	assert.NoError(t, err)
 
 	reservations, err := parseReservations(data)
