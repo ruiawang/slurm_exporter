@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-kit/log"
+	"github.com/sckyzo/slurm_exporter/internal/logger"
 )
 
 func TestGPUsMetrics(t *testing.T) {
@@ -68,13 +68,13 @@ func TestGPUsGetMetrics(t *testing.T) {
 	for _, test_data_path := range test_data_paths {
 		slurm_version := strings.TrimPrefix(test_data_path, "../test_data/slurm-")
 		t.Run(slurm_version, func(t *testing.T) {
-			Execute = func(logger log.Logger, command string, arguments []string) ([]byte, error) {
+			Execute = func(logger *logger.Logger, command string, args []string) ([]byte, error) {
 				var file string
-				if strings.Contains(arguments[2], "GresUsed:") && strings.Contains(arguments[2], "Gres:") {
+				if strings.Contains(args[2], "GresUsed:") && strings.Contains(args[2], "Gres:") {
 					file = filepath.Join(test_data_path, "sinfo_gpus_idle.txt")
-				} else if strings.Contains(arguments[2], "GresUsed:") {
+				} else if strings.Contains(args[2], "GresUsed:") {
 					file = filepath.Join(test_data_path, "sinfo_gpus_allocated.txt")
-				} else if strings.Contains(arguments[2], "Gres:") {
+				} else if strings.Contains(args[2], "Gres:") {
 					file = filepath.Join(test_data_path, "sinfo_gpus_total.txt")
 				}
 				data, err := os.ReadFile(file)
@@ -84,8 +84,8 @@ func TestGPUsGetMetrics(t *testing.T) {
 				return data, nil
 			}
 
-			logger := log.NewNopLogger()
-			metrics, err := GPUsGetMetrics(logger)
+			testLogger := logger.NewLogger("debug")
+			metrics, err := GPUsGetMetrics(testLogger)
 			if err != nil {
 				t.Fatalf("GPUsGetMetrics() error: %v", err)
 			}
@@ -93,4 +93,3 @@ func TestGPUsGetMetrics(t *testing.T) {
 		})
 	}
 }
-

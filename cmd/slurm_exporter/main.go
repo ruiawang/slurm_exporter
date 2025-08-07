@@ -35,7 +35,7 @@ var (
 	// Flags for command-line configuration
 	commandTimeout = kingpin.Flag("command.timeout", "Timeout for executing Slurm commands.").Default("5s").Duration()
 	logLevel       = kingpin.Flag("log.level", "Only log messages with the given severity or above. One of: [debug, info, warn, error]").Default("info").Enum("debug", "info", "warn", "error")
-	logFormat      = kingpin.Flag("log.format", "Log format. One of: [json, text]").Default("json").Enum("json", "text")
+	logFormat      = kingpin.Flag("log.format", "Log format. One of: [json, text]").Default("text").Enum("json", "text")
 	toolkitFlags   = webflag.AddFlags(kingpin.CommandLine, ":9341")
 
 	// Map to store the state of collectors
@@ -44,17 +44,17 @@ var (
 
 // Map of collector constructors
 var collectorConstructors = map[string]func(logger *logger.Logger) prometheus.Collector{
-	"accounts":   func(l *logger.Logger) prometheus.Collector { return collector.NewAccountsCollector(l) },
-	"cpus":       func(l *logger.Logger) prometheus.Collector { return collector.NewCPUsCollector(l) },
-	"nodes":      func(l *logger.Logger) prometheus.Collector { return collector.NewNodesCollector(l) },
-	"node":       func(l *logger.Logger) prometheus.Collector { return collector.NewNodeCollector(l) },
-	"partitions": func(l *logger.Logger) prometheus.Collector { return collector.NewPartitionsCollector(l) },
-	"queue":      func(l *logger.Logger) prometheus.Collector { return collector.NewQueueCollector(l) },
-	"scheduler":  func(l *logger.Logger) prometheus.Collector { return collector.NewSchedulerCollector(l) },
-	"fairshare":  func(l *logger.Logger) prometheus.Collector { return collector.NewFairShareCollector(l) },
-	"users":      func(l *logger.Logger) prometheus.Collector { return collector.NewUsersCollector(l) },
-	"info":       func(l *logger.Logger) prometheus.Collector { return collector.NewSlurmInfoCollector(l) },
-	"gpus":       func(l *logger.Logger) prometheus.Collector { return collector.NewGPUsCollector(l) },
+	"accounts":     func(l *logger.Logger) prometheus.Collector { return collector.NewAccountsCollector(l) },
+	"cpus":         func(l *logger.Logger) prometheus.Collector { return collector.NewCPUsCollector(l) },
+	"nodes":        func(l *logger.Logger) prometheus.Collector { return collector.NewNodesCollector(l) },
+	"node":         func(l *logger.Logger) prometheus.Collector { return collector.NewNodeCollector(l) },
+	"partitions":   func(l *logger.Logger) prometheus.Collector { return collector.NewPartitionsCollector(l) },
+	"queue":        func(l *logger.Logger) prometheus.Collector { return collector.NewQueueCollector(l) },
+	"scheduler":    func(l *logger.Logger) prometheus.Collector { return collector.NewSchedulerCollector(l) },
+	"fairshare":    func(l *logger.Logger) prometheus.Collector { return collector.NewFairShareCollector(l) },
+	"users":        func(l *logger.Logger) prometheus.Collector { return collector.NewUsersCollector(l) },
+	"info":         func(l *logger.Logger) prometheus.Collector { return collector.NewSlurmInfoCollector(l) },
+	"gpus":         func(l *logger.Logger) prometheus.Collector { return collector.NewGPUsCollector(l) },
 	"reservations": func(l *logger.Logger) prometheus.Collector { return collector.NewReservationsCollector(l) },
 }
 
