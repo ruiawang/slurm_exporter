@@ -8,6 +8,41 @@
 
 Prometheus collector and exporter for metrics extracted from the [Slurm](https://slurm.schedmd.com/overview.html) resource scheduling system.
 
+## 📋 Table of Contents
+
+- [Prometheus Slurm Exporter 🚀](#prometheus-slurm-exporter-)
+  - [📋 Table of Contents](#-table-of-contents)
+  - [✨ Features](#-features)
+  - [📦 Installation](#-installation)
+    - [1. From Pre-compiled Releases](#1-from-pre-compiled-releases)
+    - [2. From Source](#2-from-source)
+  - [⚙️ Usage](#️-usage)
+    - [Command-Line Options](#command-line-options)
+    - [Enabling and Disabling Collectors](#enabling-and-disabling-collectors)
+  - [🛠️ Development](#️-development)
+    - [Prerequisites](#prerequisites)
+    - [Building from Source](#building-from-source)
+    - [Running Tests](#running-tests)
+    - [Development Commands](#development-commands)
+  - [📊 Metrics](#-metrics)
+    - [`accounts` Collector](#accounts-collector)
+    - [`cpus` Collector](#cpus-collector)
+    - [`fairshare` Collector](#fairshare-collector)
+    - [`gpus` Collector](#gpus-collector)
+    - [`info` Collector](#info-collector)
+    - [`node` Collector](#node-collector)
+    - [`nodes` Collector](#nodes-collector)
+    - [`partitions` Collector](#partitions-collector)
+    - [`queue` Collector](#queue-collector)
+    - [`reservations` Collector](#reservations-collector)
+    - [`scheduler` Collector](#scheduler-collector)
+    - [`users` Collector](#users-collector)
+  - [📡 Prometheus Configuration](#-prometheus-configuration)
+    - [Performance Considerations](#performance-considerations)
+  - [📈 Grafana Dashboard](#-grafana-dashboard)
+  - [📜 License](#-license)
+  - [🍴 About this fork](#-about-this-fork)
+
 ---
 
 ## ✨ Features
@@ -63,8 +98,6 @@ If you want to build the exporter yourself, you can do so using the provided Mak
    ```
 
 3. The new binary will be available at `bin/slurm_exporter`. You can then copy it to a location like `/usr/local/bin/` and set up the Systemd service as described in the section above.
-
-For more details on the development environment and dependencies, please refer to the [DEVELOPMENT.md](DEVELOPMENT.md) file.
 
 ---
 
@@ -149,6 +182,63 @@ This requires disabling all other collectors individually.
   --command.timeout=10s \
   --log.level=debug \
   --log.format=json
+```
+
+---
+
+## 🛠️ Development
+
+This project requires access to a node with the Slurm CLI (`sinfo`, `squeue`, `sdiag`, etc.).
+
+### Prerequisites
+
+- [Go](https://golang.org/dl/) (version 1.22 or higher recommended)
+- Slurm CLI tools available in your `$PATH`
+
+### Building from Source
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/sckyzo/slurm_exporter.git
+   cd slurm_exporter
+   ```
+
+2. Build the exporter binary:
+   ```bash
+   make build
+   ```
+
+   The binary will be available in `bin/slurm_exporter`.
+
+### Running Tests
+
+To run all tests:
+
+```bash
+make test
+```
+
+### Development Commands
+
+**Clean build artifacts:**
+```bash
+make clean
+```
+
+**Run the exporter locally:**
+```bash
+bin/slurm_exporter --web.listen-address=:8080
+```
+
+**Query metrics:**
+```bash
+curl http://localhost:8080/metrics
+```
+
+**Advanced build options:**
+You can override the Go version and architecture via environment variables:
+```bash
+make build GO_VERSION=1.22.2 OS=linux ARCH=amd64
 ```
 
 ---

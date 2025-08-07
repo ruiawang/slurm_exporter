@@ -8,7 +8,7 @@ OS ?= linux
 ARCH ?= amd64
 GOPATH := $(shell pwd)/go/modules
 GOBIN := bin/$(PROJECT_NAME)
-GOFILES := $(wildcard cmd/slurm_exporter/*.go)
+GOFILES := $(shell find . -name "*.go" -type f)
 GO_URL := https://dl.google.com/go/go$(GO_VERSION).$(OS)-$(ARCH).tar.gz
 GOPATH_ENV := GOPATH=$(GOPATH) PATH=$(shell pwd)/go/bin:$(PATH)
 
@@ -30,8 +30,6 @@ LDFLAGS = \
 	-X 'github.com/prometheus/common/version.BuildUser=$(BUILD_USER)' \
 	-X 'github.com/prometheus/common/version.BuildDate=$(BUILD_DATE)'
 
-# Check if the installed Go version matches the required version
-GO_INSTALLED_VERSION := $(shell go version 2>/dev/null | awk '{print $3}' | sed 's/go//g')
 
 .PHONY: all
 all: setup build
@@ -69,7 +67,7 @@ go/modules/pkg/mod: go.mod
 
 # Test target to run all tests
 .PHONY: test
-test: go/modules/pkg/mod $(GOFILES)
+test: $(GOFILES)
 	@echo "Running tests"
 	go test -v ./...
 
