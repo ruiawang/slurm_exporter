@@ -1,5 +1,11 @@
 # Prometheus Slurm Exporter 🚀
 
+[![Release](https://github.com/sckyzo/slurm_exporter/actions/workflows/release.yml/badge.svg)](https://github.com/sckyzo/slurm_exporter/actions/workflows/release.yml)
+[![Create Dev Release](https://github.com/sckyzo/slurm_exporter/actions/workflows/dev-release.yml/badge.svg)](https://github.com/sckyzo/slurm_exporter/actions/workflows/dev-release.yml)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/sckyzo/slurm_exporter)](https://github.com/sckyzo/slurm_exporter/releases/latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/sckyzo/slurm_exporter)](https://goreportcard.com/report/github.com/sckyzo/slurm_exporter)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 Prometheus collector and exporter for metrics extracted from the [Slurm](https://slurm.schedmd.com/overview.html) resource scheduling system.
 
 ---
