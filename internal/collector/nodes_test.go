@@ -25,7 +25,7 @@ import (
 
 func TestNodesMetrics(t *testing.T) {
 	// Read the input data from a file
-	file, err := os.Open("../test_data/sinfo.txt")
+	file, err := os.Open("../../test_data/sinfo.txt")
 	if err != nil {
 		t.Fatalf("Can not open test data: %v", err)
 	}

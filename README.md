@@ -24,6 +24,7 @@ This is the easiest method for most users.
 1. Download the latest release for your OS and architecture from the [GitHub Releases](https://github.com/sckyzo/slurm_exporter/releases) page. 📥
 2. Place the `slurm_exporter` binary in a suitable location on a node with Slurm CLI access, such as `/usr/local/bin/`.
 3. Ensure the binary is executable:
+
    ```bash
    chmod +x /usr/local/bin/slurm_exporter
    ```
@@ -31,6 +32,7 @@ This is the easiest method for most users.
 4. (Optional) To run the exporter as a service, you can adapt the example Systemd unit file provided in this repository at [systemd/slurm_exporter.service](systemd/slurm_exporter.service).
    - Copy it to `/etc/systemd/system/slurm_exporter.service` and customize it for your environment (especially the `ExecStart` path).
    - Reload the Systemd daemon, then enable and start the service:
+
      ```bash
      sudo systemctl daemon-reload
      sudo systemctl enable slurm_exporter
@@ -42,12 +44,14 @@ This is the easiest method for most users.
 If you want to build the exporter yourself, you can do so using the provided Makefile. 👩‍💻
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/sckyzo/slurm_exporter.git
    cd slurm_exporter
    ```
 
 2. Build the binary:
+
    ```bash
    make build
    ```

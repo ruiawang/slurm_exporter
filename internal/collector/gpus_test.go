@@ -64,7 +64,7 @@ func TestGPUsGetMetrics(t *testing.T) {
 	oldExecute := Execute
 	defer func() { Execute = oldExecute }()
 
-	test_data_paths, _ := filepath.Glob("../test_data/slurm-*")
+	test_data_paths, _ := filepath.Glob("../../test_data/slurm-*")
 	for _, test_data_path := range test_data_paths {
 		slurm_version := strings.TrimPrefix(test_data_path, "../test_data/slurm-")
 		t.Run(slurm_version, func(t *testing.T) {
