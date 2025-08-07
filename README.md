@@ -21,35 +21,38 @@ There are two recommended ways to install the Slurm Exporter.
 
 This is the easiest method for most users.
 
-1.  Download the latest release for your OS and architecture from the [GitHub Releases](https://github.com/sckyzo/slurm_exporter/releases) page. 📥
-2.  Place the `slurm_exporter` binary in a suitable location on a node with Slurm CLI access, such as `/usr/local/bin/`.
-3.  Ensure the binary is executable:
-    ```bash
-    chmod +x /usr/local/bin/slurm_exporter
-    ```
-4.  (Optional) To run the exporter as a service, you can adapt the example Systemd unit file provided in this repository at [systemd/slurm_exporter.service](systemd/slurm_exporter.service).
-    -   Copy it to `/etc/systemd/system/slurm_exporter.service` and customize it for your environment (especially the `ExecStart` path).
-    -   Reload the Systemd daemon, then enable and start the service:
-        ```bash
-        sudo systemctl daemon-reload
-        sudo systemctl enable slurm_exporter
-        sudo systemctl start slurm_exporter
-        ```
+1. Download the latest release for your OS and architecture from the [GitHub Releases](https://github.com/sckyzo/slurm_exporter/releases) page. 📥
+2. Place the `slurm_exporter` binary in a suitable location on a node with Slurm CLI access, such as `/usr/local/bin/`.
+3. Ensure the binary is executable:
+   ```bash
+   chmod +x /usr/local/bin/slurm_exporter
+   ```
+
+4. (Optional) To run the exporter as a service, you can adapt the example Systemd unit file provided in this repository at [systemd/slurm_exporter.service](systemd/slurm_exporter.service).
+   - Copy it to `/etc/systemd/system/slurm_exporter.service` and customize it for your environment (especially the `ExecStart` path).
+   - Reload the Systemd daemon, then enable and start the service:
+     ```bash
+     sudo systemctl daemon-reload
+     sudo systemctl enable slurm_exporter
+     sudo systemctl start slurm_exporter
+     ```
 
 ### 2. From Source
 
 If you want to build the exporter yourself, you can do so using the provided Makefile. 👩‍💻
 
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/sckyzo/slurm_exporter.git
-    cd slurm_exporter
-    ```
-2.  Build the binary:
-    ```bash
-    make build
-    ```
-3.  The new binary will be available at `bin/slurm_exporter`. You can then copy it to a location like `/usr/local/bin/` and set up the Systemd service as described in the section above.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/sckyzo/slurm_exporter.git
+   cd slurm_exporter
+   ```
+
+2. Build the binary:
+   ```bash
+   make build
+   ```
+
+3. The new binary will be available at `bin/slurm_exporter`. You can then copy it to a location like `/usr/local/bin/` and set up the Systemd service as described in the section above.
 
 For more details on the development environment and dependencies, please refer to the [DEVELOPMENT.md](DEVELOPMENT.md) file.
 
@@ -60,34 +63,61 @@ For more details on the development environment and dependencies, please refer t
 The exporter can be configured using command-line flags.
 
 **Basic execution:**
+
 ```bash
 ./slurm_exporter --web.listen-address=":9341"
 ```
 
 **Using a configuration file for web settings (TLS/Basic Auth):**
+
 ```bash
 ./slurm_exporter --web.config.file=/path/to/web-config.yml
 ```
+
 For details on the `web-config.yml` format, see the [Exporter Toolkit documentation](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
+
+**View help and all available options:**
+
+```bash
+./slurm_exporter --help
+```
+
+### Command-Line Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--web.listen-address` | Address to listen on for web interface and telemetry | `:9341` |
+| `--web.config.file` | Path to configuration file for TLS/Basic Auth | (none) |
+| `--command.timeout` | Timeout for executing Slurm commands | `5s` |
+| `--log.level` | Log level: `debug`, `info`, `warn`, `error` | `info` |
+| `--log.format` | Log format: `json`, `text` | `text` |
+| `--collector.<name>` | Enable the specified collector | `true` (all enabled by default) |
+| `--no-collector.<name>` | Disable the specified collector | (none) |
+
+**Available collectors:** `accounts`, `cpus`, `fairshare`, `gpus`, `info`, `node`, `nodes`, `partitions`, `queue`, `reservations`, `scheduler`, `users`
 
 ### Enabling and Disabling Collectors
 
-By default, all collectors are **enabled**, except for the `gpus` collector which is **disabled**.
+By default, all collectors are **enabled**.
 
 You can control which collectors are active using the `--collector.<name>` and `--no-collector.<name>` flags.
 
 **Example: Disable the `scheduler` and `partitions` collectors**
+
 ```bash
 ./slurm_exporter --no-collector.scheduler --no-collector.partitions
 ```
 
-**Example: Enable the `gpus` collector**
+**Example: Disable the `gpus` collector**
+
 ```bash
-./slurm_exporter --collector.gpus
+./slurm_exporter --no-collector.gpus
 ```
 
 **Example: Run only the `nodes` and `cpus` collectors**
+
 This requires disabling all other collectors individually.
+
 ```bash
 ./slurm_exporter \
   --no-collector.accounts \
@@ -102,6 +132,15 @@ This requires disabling all other collectors individually.
   --no-collector.users
 ```
 
+**Example: Custom timeout and logging**
+
+```bash
+./slurm_exporter \
+  --command.timeout=10s \
+  --log.level=debug \
+  --log.format=json
+```
+
 ---
 
 ## 📊 Metrics
@@ -109,7 +148,9 @@ This requires disabling all other collectors individually.
 The exporter provides a wide range of metrics, each collected by a specific, toggleable collector.
 
 ### `accounts` Collector
+
 Provides job statistics aggregated by Slurm account.
+
 - **Command:** `squeue -a -r -h -o "%A|%a|%T|%C"`
 
 | Metric | Description | Labels |
@@ -120,7 +161,9 @@ Provides job statistics aggregated by Slurm account.
 | `slurm_account_jobs_suspended` | Suspended jobs for account | `account` |
 
 ### `cpus` Collector
+
 Provides global statistics on CPU states for the entire cluster.
+
 - **Command:** `sinfo -h -o "%C"`
 
 | Metric | Description | Labels |
@@ -131,7 +174,9 @@ Provides global statistics on CPU states for the entire cluster.
 | `slurm_cpus_total` | Total CPUs | (none) |
 
 ### `fairshare` Collector
+
 Reports the calculated fairshare factor for each account.
+
 - **Command:** `sshare -n -P -o "account,fairshare"`
 
 | Metric | Description | Labels |
@@ -139,8 +184,11 @@ Reports the calculated fairshare factor for each account.
 | `slurm_account_fairshare` | FairShare for account | `account` |
 
 ### `gpus` Collector
+
 Provides global statistics on GPU states for the entire cluster.
-> ⚠️ **Note:** This collector is disabled by default. Enable it with `--collector.gpus`.
+
+> ⚠️ **Note:** This collector is enabled by default. Disable it with `--no-collector.gpus` if not needed.
+
 - **Command:** `sinfo` (with various formats)
 
 | Metric | Description | Labels |
@@ -152,7 +200,9 @@ Provides global statistics on GPU states for the entire cluster.
 | `slurm_gpus_utilization` | Total GPU utilization | (none) |
 
 ### `info` Collector
+
 Exposes the version of Slurm and the availability of different Slurm binaries.
+
 - **Command:** `<binary> --version`
 
 | Metric | Description | Labels |
@@ -160,7 +210,9 @@ Exposes the version of Slurm and the availability of different Slurm binaries.
 | `slurm_info` | Information on Slurm version and binaries | `type`, `binary`, `version` |
 
 ### `node` Collector
+
 Provides detailed, per-node metrics for CPU and memory usage.
+
 - **Command:** `sinfo -h -N -O "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition"`
 
 | Metric | Description | Labels |
@@ -174,7 +226,9 @@ Provides detailed, per-node metrics for CPU and memory usage.
 | `slurm_node_status` | Node Status with partition (1 if up) | `node`, `status`, `partition` |
 
 ### `nodes` Collector
+
 Provides aggregated metrics on node states for the cluster.
+
 - **Commands:** `sinfo -h -o "%D|%T|%b"`, `scontrol show nodes -o`
 
 | Metric | Description | Labels |
@@ -194,7 +248,9 @@ Provides aggregated metrics on node states for the cluster.
 | `slurm_nodes_total` | Total number of nodes | (none) |
 
 ### `partitions` Collector
+
 Provides metrics on CPU usage and pending jobs for each partition.
+
 - **Commands:** `sinfo -h -o "%R,%C"`, `squeue -a -r -h -o "%P" --states=PENDING`
 
 | Metric | Description | Labels |
@@ -206,7 +262,9 @@ Provides metrics on CPU usage and pending jobs for each partition.
 | `slurm_partition_cpus_total` | Total CPUs for partition | `partition` |
 
 ### `queue` Collector
+
 Provides detailed metrics on job states and resource usage.
+
 - **Command:** `squeue -h -o "%P,%T,%C,%r,%u"`
 
 | Metric | Description | Labels |
@@ -219,7 +277,9 @@ Provides detailed metrics on job states and resource usage.
 | `...` | (and many other states: `completed`, `failed`, etc.) | `user`, `partition` |
 
 ### `reservations` Collector
+
 Provides metrics about active Slurm reservations.
+
 - **Command:** `scontrol show reservation`
 
 | Metric | Description | Labels |
@@ -231,7 +291,9 @@ Provides metrics about active Slurm reservations.
 | `slurm_reservation_core_count` | The number of cores allocated to the reservation | `reservation_name` |
 
 ### `scheduler` Collector
+
 Provides internal performance metrics from the `slurmctld` daemon.
+
 - **Command:** `sdiag`
 
 | Metric | Description | Labels |
@@ -244,7 +306,9 @@ Provides internal performance metrics from the `slurmctld` daemon.
 | `...` | (and many other backfill and RPC time metrics) | `operation` or `user` |
 
 ### `users` Collector
+
 Provides job statistics aggregated by user.
+
 - **Command:** `squeue -a -r -h -o "%A|%u|%T|%C"`
 
 | Metric | Description | Labels |
@@ -271,9 +335,26 @@ scrape_configs:
 - **scrape_timeout**: Should be equal to or less than the `scrape_interval` to prevent `context_deadline_exceeded` errors.
 
 Check config:
+
 ```bash
 promtool check-config prometheus.yml
 ```
+
+### Performance Considerations
+
+- **Command Timeout**: The default timeout is 5 seconds. Increase it if Slurm commands take longer in your environment:
+  
+  ```bash
+  ./slurm_exporter --command.timeout=10s
+  ```
+
+- **Scrape Interval**: Use at least 30 seconds to avoid overloading the Slurm controller with frequent command executions.
+
+- **Collector Selection**: Disable unused collectors to reduce load and improve performance:
+  
+  ```bash
+  ./slurm_exporter --no-collector.fairshare --no-collector.reservations
+  ```
 
 ---
 
