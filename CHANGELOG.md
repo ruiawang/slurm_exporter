@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-08-07
+
+This release focuses on major architectural improvements and modernization of the codebase. The project structure has been reorganized to follow Go best practices, and the logging system has been migrated from go-kit/log to the standard log/slog package for better performance and structured logging.
+
+### 🏗️ Major Changes
+
+- **Project Restructuring:** Moved main.go to `cmd/slurm_exporter/` directory following Go standards
+- **Logging Migration:** Migrated from go-kit/log to log/slog for better performance and structured logging
+- **Code Organization:** Reorganized code with `internal/logger/` and `internal/collector/` packages
+- **Structured Logging:** Implemented structured logging system across all collectors
+
+### 🔧 Improvements
+
+- **Markdown Formatting:** Fixed markdown formatting issues in README.md (MD030/list-marker-space)
+- **Code Formatting:** Improved code formatting and logger consistency
+- **Default Settings:** Changed default log format from json to text for better readability
+- **Project Visibility:** Added status badges to README for GitHub Actions, releases, and code quality
+- **GoReleaser Configuration:** Fixed GoReleaser configuration for new project structure
+- **Changelog Configuration:** Added explicit changelog configuration to GoReleaser
+
+### 🐛 Bug Fixes
+
+- **Test File Paths:** Fixed test file paths in all test files (corrected relative paths)
+- **Build Configuration:** Fixed "build does not contain a main function" error in GoReleaser workflow
+- **Tag Management:** Removed problematic `master` tag that was causing changelog generation issues
+
+### ⚙️ Technical Improvements
+
+- **Better Code Alignment:** Improved code alignment and organization throughout the project
+- **Test Reliability:** All tests now pass successfully with correct file references
+- **Build Process:** Ensured proper binary building after project restructuring
+
+---
+
 ## [1.0.0] - 2025-07-21
 
 This release marks a major milestone, signifying a stable and feature-rich version of the Slurm Exporter. It includes a complete overhaul of the CI/CD pipeline, numerous new collectors, significant refactoring for better maintainability, and several important bug fixes.
