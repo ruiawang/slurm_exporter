@@ -48,6 +48,7 @@ var collectorConstructors = map[string]func(logger *logger.Logger) prometheus.Co
 	"cpus":         func(l *logger.Logger) prometheus.Collector { return collector.NewCPUsCollector(l) },
 	"nodes":        func(l *logger.Logger) prometheus.Collector { return collector.NewNodesCollector(l) },
 	"node":         func(l *logger.Logger) prometheus.Collector { return collector.NewNodeCollector(l) },
+	"job":          func(l *logger.Logger) prometheus.Collector { return collector.NewJobCollector(l) },
 	"partitions":   func(l *logger.Logger) prometheus.Collector { return collector.NewPartitionsCollector(l) },
 	"queue":        func(l *logger.Logger) prometheus.Collector { return collector.NewQueueCollector(l) },
 	"scheduler":    func(l *logger.Logger) prometheus.Collector { return collector.NewSchedulerCollector(l) },

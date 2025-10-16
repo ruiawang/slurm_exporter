@@ -17,7 +17,7 @@ func AccountsData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-a", "-r", "-h", "-o", "%A|%a|%T|%C"})
 }
 
-type JobMetrics struct {
+type AccountJobMetrics struct {
 	pending      float64
 	running      float64
 	running_cpus float64
@@ -28,15 +28,15 @@ type JobMetrics struct {
 ParseAccountsMetrics parses the output of the squeue command for account-specific job metrics.
 It expects input in the format: "JobID|Account|State|CPUs".
 */
-func ParseAccountsMetrics(input []byte) map[string]*JobMetrics {
-	accounts := make(map[string]*JobMetrics)
+func ParseAccountsMetrics(input []byte) map[string]*AccountJobMetrics {
+	accounts := make(map[string]*AccountJobMetrics)
 	lines := strings.Split(string(input), "\n")
 	for _, line := range lines {
 		if strings.Contains(line, "|") {
 			account := strings.Split(line, "|")[1]
 			_, key := accounts[account]
 			if !key {
-				accounts[account] = &JobMetrics{0, 0, 0, 0}
+				accounts[account] = &AccountJobMetrics{0, 0, 0, 0}
 			}
 			state := strings.Split(line, "|")[2]
 			state = strings.ToLower(state)
