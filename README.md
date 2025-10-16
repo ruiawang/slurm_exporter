@@ -309,6 +309,20 @@ Exposes the version of Slurm and the availability of different Slurm binaries.
 |---|---|---|
 | `slurm_info` | Information on Slurm version and binaries | `type`, `binary`, `version` |
 
+### `job` Collector
+
+Provides detailed, per-job metrics regarding status and CPU.
+- **Command:** `squeue -h -o "%P,%T,%C,%i,%j,%r,%u"`
+
+| Metric | Description | Labels |
+|---|---|---|
+| `slurm_job_cpus` | CPUs allocated for job | `job`, `status`, `partition` |
+| `slurm_job_id` | Job ID for job | `job`, `status`, `partition` |
+| `slurm_job_name` | Job name for job | `job`, `status`, `partition` |
+| `slurm_job_status` | Job Status with partition (1 if up) | `job`, `status`, `partition` |
+| `slurm_job_reason` | Reason for job status | `job`, `status`, `partition` |
+| `slurm_job_user` | User who submitted job | `job`, `status`, `partition` |
+
 ### `node` Collector
 
 Provides detailed, per-node metrics for CPU and memory usage.
