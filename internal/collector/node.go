@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,6 +20,9 @@ type NodeMetrics struct {
 	cpuTotal   uint64
 	nodeStatus string
 	partitions []string
+	reason     string
+	user       string
+	timestamp  string
 }
 
 func NodeGetMetrics(logger *logger.Logger) (map[string]*NodeMetrics, error) {
@@ -39,9 +43,10 @@ func ParseNodeMetrics(input []byte) map[string]*NodeMetrics {
 	sort.Strings(lines)
 	linesUniq := RemoveDuplicates(lines)
 
+	re := regexp.MustCompile(`\s{2,}`) // Split by two or more spaces, since Reason field can have singular spaces
 	for _, line := range linesUniq {
-		node := strings.Fields(line)
-		if len(node) < 6 {
+		node := re.Split(line, -1)
+		if len(node) < 9 {
 			continue
 		}
 		nodeName := node[0]
@@ -50,7 +55,7 @@ func ParseNodeMetrics(input []byte) map[string]*NodeMetrics {
 
 		// Create new node metrics if it doesn't exist
 		if _, exists := nodes[nodeName]; !exists {
-			nodes[nodeName] = &NodeMetrics{0, 0, 0, 0, 0, 0, nodeStatus, []string{}}
+			nodes[nodeName] = &NodeMetrics{0, 0, 0, 0, 0, 0, nodeStatus, []string{}, "", "", ""}
 		}
 
 		memAlloc, _ := strconv.ParseUint(node[1], 10, 64)
@@ -69,6 +74,13 @@ func ParseNodeMetrics(input []byte) map[string]*NodeMetrics {
 		nodes[nodeName].cpuOther = cpuOther
 		nodes[nodeName].cpuTotal = cpuTotal
 
+		reason := node[6]
+		user := node[7]
+		timestamp := node[8]
+
+		nodes[nodeName].reason = reason
+		nodes[nodeName].user = user
+		nodes[nodeName].timestamp = timestamp
 		// Add the partition if it's not already in the list
 		nodes[nodeName].partitions = appendUnique(nodes[nodeName].partitions, partition)
 	}
@@ -78,10 +90,10 @@ func ParseNodeMetrics(input []byte) map[string]*NodeMetrics {
 
 /*
 NodeData executes the sinfo command to get detailed data for each node.
-Expected sinfo output format: "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition".
+Expected sinfo output format: "NodeList,AllocMem,Memory,CPUsState,StateLong,Partition,Reason,UserLong,Timestamp".
 */
 func NodeData(logger *logger.Logger) ([]byte, error) {
-	args := []string{"-h", "-N", "-O", "NodeList:25,AllocMem,Memory,CPUsState,StateLong,Partition"}
+	args := []string{"-h", "-N", "-O", "NodeList:25,AllocMem,Memory,CPUsState,StateLong,Partition,Reason:30,UserLong,Timestamp"}
 	return Execute(logger, "sinfo", args)
 }
 
@@ -97,7 +109,7 @@ type NodeCollector struct {
 }
 
 func NewNodeCollector(logger *logger.Logger) *NodeCollector {
-	labels := []string{"node", "status", "partition"}
+	labels := []string{"node", "status", "partition", "reason", "user", "timestamp"}
 	return &NodeCollector{
 		cpuAlloc:   prometheus.NewDesc("slurm_node_cpu_alloc", "Allocated CPUs per node", labels, nil),
 		cpuIdle:    prometheus.NewDesc("slurm_node_cpu_idle", "Idle CPUs per node", labels, nil),
@@ -128,13 +140,13 @@ func (nc *NodeCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	for node, metrics := range nodes {
 		for _, partition := range metrics.partitions {
-			ch <- prometheus.MustNewConstMetric(nc.cpuAlloc, prometheus.GaugeValue, float64(metrics.cpuAlloc), node, metrics.nodeStatus, partition)
-			ch <- prometheus.MustNewConstMetric(nc.cpuIdle, prometheus.GaugeValue, float64(metrics.cpuIdle), node, metrics.nodeStatus, partition)
-			ch <- prometheus.MustNewConstMetric(nc.cpuOther, prometheus.GaugeValue, float64(metrics.cpuOther), node, metrics.nodeStatus, partition)
-			ch <- prometheus.MustNewConstMetric(nc.cpuTotal, prometheus.GaugeValue, float64(metrics.cpuTotal), node, metrics.nodeStatus, partition)
-			ch <- prometheus.MustNewConstMetric(nc.memAlloc, prometheus.GaugeValue, float64(metrics.memAlloc), node, metrics.nodeStatus, partition)
-			ch <- prometheus.MustNewConstMetric(nc.memTotal, prometheus.GaugeValue, float64(metrics.memTotal), node, metrics.nodeStatus, partition)
-			ch <- prometheus.MustNewConstMetric(nc.nodeStatus, prometheus.GaugeValue, 1, node, metrics.nodeStatus, partition)
+			ch <- prometheus.MustNewConstMetric(nc.cpuAlloc, prometheus.GaugeValue, float64(metrics.cpuAlloc), node, metrics.nodeStatus, partition, metrics.reason, metrics.user, metrics.timestamp)
+			ch <- prometheus.MustNewConstMetric(nc.cpuIdle, prometheus.GaugeValue, float64(metrics.cpuIdle), node, metrics.nodeStatus, partition, metrics.reason, metrics.user, metrics.timestamp)
+			ch <- prometheus.MustNewConstMetric(nc.cpuOther, prometheus.GaugeValue, float64(metrics.cpuOther), node, metrics.nodeStatus, partition, metrics.reason, metrics.user, metrics.timestamp)
+			ch <- prometheus.MustNewConstMetric(nc.cpuTotal, prometheus.GaugeValue, float64(metrics.cpuTotal), node, metrics.nodeStatus, partition, metrics.reason, metrics.user, metrics.timestamp)
+			ch <- prometheus.MustNewConstMetric(nc.memAlloc, prometheus.GaugeValue, float64(metrics.memAlloc), node, metrics.nodeStatus, partition, metrics.reason, metrics.user, metrics.timestamp)
+			ch <- prometheus.MustNewConstMetric(nc.memTotal, prometheus.GaugeValue, float64(metrics.memTotal), node, metrics.nodeStatus, partition, metrics.reason, metrics.user, metrics.timestamp)
+			ch <- prometheus.MustNewConstMetric(nc.nodeStatus, prometheus.GaugeValue, 1, node, metrics.nodeStatus, partition, metrics.reason, metrics.user, metrics.timestamp)
 		}
 	}
 }

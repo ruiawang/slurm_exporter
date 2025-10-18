@@ -33,15 +33,15 @@ func ParseJobMetrics(input []byte) map[string]*JobMetrics {
 	jobs := make(map[string]*JobMetrics)
 	lines := strings.Split(string(input), "\n")
 	for _, line := range lines {
-		if strings.Contains(line, ",") {
-			part := strings.Split(line, ",")[0]
+		if strings.Contains(line, "|") {
+			part := strings.Split(line, "|")[0]
 			part = strings.TrimSpace(part)
-			state := strings.Split(line, ",")[1]
-			cores, _ := strconv.Atoi(strings.Split(line, ",")[2])
-			id := strings.Split(line, ",")[3]
-			name := strings.Split(line, ",")[4]
-			reason := strings.Split(line, ",")[5]
-			user := strings.Split(line, ",")[6]
+			state := strings.Split(line, "|")[1]
+			cores, _ := strconv.Atoi(strings.Split(line, "|")[2])
+			id := strings.Split(line, "|")[3]
+			name := strings.Split(line, "|")[4]
+			reason := strings.Split(line, "|")[5]
+			user := strings.Split(line, "|")[6]
 			user = strings.TrimSpace(user)
 
 			if _, exists := jobs[id]; !exists {
@@ -66,7 +66,7 @@ JobData executes the squeue command to retrieve job information
 Expected squeue output format: "%P,%T,%C,%i,%j,%r,%u" (Partition,State,CPUs,ID,Name,Reason,User).
 */
 func JobData(logger *logger.Logger) ([]byte, error) {
-	return Execute(logger, "squeue", []string{"-h", "-o", "%P,%T,%C,%i,%j,%r,%u"})
+	return Execute(logger, "squeue", []string{"-h", "-o", "%P|%T|%C|%i|%j|%r|%u"})
 }
 
 /*
@@ -78,32 +78,20 @@ func NewJobCollector(logger *logger.Logger) *JobCollector {
 	labels := []string{"job", "name", "status", "reason", "partition", "user"}
 	return &JobCollector{
 		jobCPUs:   prometheus.NewDesc("slurm_job_cpus", "CPUs allocated for job", labels, nil),
-		jobID:     prometheus.NewDesc("slurm_job_id", "Job ID with partition", labels, nil),
-		jobName:   prometheus.NewDesc("slurm_job_name", "Job Name with partition", labels, nil),
 		jobStatus: prometheus.NewDesc("slurm_job_status", "Job Status with partition", labels, nil),
-		jobReason: prometheus.NewDesc("slurm_job_reason", "Job Reason with partition", labels, nil),
-		user:      prometheus.NewDesc("slurm_job_user", "Job User with partition", labels, nil),
 		logger:    logger,
 	}
 }
 
 type JobCollector struct {
 	jobCPUs   *prometheus.Desc
-	jobID     *prometheus.Desc
-	jobName   *prometheus.Desc
 	jobStatus *prometheus.Desc
-	jobReason *prometheus.Desc
-	user      *prometheus.Desc
 	logger    *logger.Logger
 }
 
 func (jc *JobCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- jc.jobCPUs
-	ch <- jc.jobID
-	ch <- jc.jobName
 	ch <- jc.jobStatus
-	ch <- jc.jobReason
-	ch <- jc.user
 }
 
 func (jc *JobCollector) Collect(ch chan<- prometheus.Metric) {
