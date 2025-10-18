@@ -115,8 +115,8 @@ func (jc *JobCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	for job, metrics := range jobs {
 		for _, partition := range metrics.partitions {
-			ch <- prometheus.MustNewConstMetric(jc.jobCPUs, prometheus.GaugeValue, float64(metrics.jobCPUs), job, metrics.jobName, metrics.jobStatus, metrics.jobReason, partition)
-			ch <- prometheus.MustNewConstMetric(jc.jobStatus, prometheus.GaugeValue, 1, job, metrics.jobName, metrics.jobStatus, metrics.jobReason, partition)
+			ch <- prometheus.MustNewConstMetric(jc.jobCPUs, prometheus.GaugeValue, float64(metrics.jobCPUs), job, metrics.jobStatus, partition)
+			ch <- prometheus.MustNewConstMetric(jc.jobStatus, prometheus.GaugeValue, 1, job, metrics.jobStatus, partition)
 		}
 	}
 }
