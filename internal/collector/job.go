@@ -28,7 +28,7 @@ func JobGetMetrics(logger *logger.Logger) (map[string]*JobMetrics, error) {
 
 // ParseJobMetrics takes the output of squeue with job data
 // It returns a map of metrics per job, including partitions
-// Expects squeue output format:"%P,%i,%j,%T,%C,%r,%u" (Partition,ID,Name,State,CPUs,Reason,User)
+// Expects squeue output format: "%P,%T,%C,%i,%j,%r,%u" (Partition,State,CPUs,ID,Name,Reason,User)
 func ParseJobMetrics(input []byte) map[string]*JobMetrics {
 	jobs := make(map[string]*JobMetrics)
 	lines := strings.Split(string(input), "\n")
@@ -36,18 +36,17 @@ func ParseJobMetrics(input []byte) map[string]*JobMetrics {
 		if strings.Contains(line, ",") {
 			part := strings.Split(line, ",")[0]
 			part = strings.TrimSpace(part)
-			id := strings.Split(line, ",")[1]
-			name := strings.Split(line, ",")[2]
-			state := strings.Split(line, ",")[3]
-			cores, _ := strconv.Atoi(strings.Split(line, ",")[4])
+			state := strings.Split(line, ",")[1]
+			cores, _ := strconv.Atoi(strings.Split(line, ",")[2])
+			id := strings.Split(line, ",")[3]
+			name := strings.Split(line, ",")[4]
 			reason := strings.Split(line, ",")[5]
 			user := strings.Split(line, ",")[6]
 			user = strings.TrimSpace(user)
 
 			if _, exists := jobs[id]; !exists {
-				jobs[id] = &JobMetrics{0, name, state, reason, user, []string{}}
+				jobs[id] = &JobMetrics{uint64(cores), name, state, reason, user, []string{part}}
 			}
-
 			jobs[id].jobCPUs = uint64(cores)
 			jobs[id].jobName = name
 			jobs[id].jobStatus = state
@@ -64,7 +63,7 @@ func ParseJobMetrics(input []byte) map[string]*JobMetrics {
 
 /*
 JobData executes the squeue command to retrieve job information
-Expected squeue output format: "%P,%i,%j,%T,%C,%r,%u" (Partition,State,CPUs,ID,Name,Reason,User).
+Expected squeue output format: "%P,%T,%C,%i,%j,%r,%u" (Partition,State,CPUs,ID,Name,Reason,User).
 */
 func JobData(logger *logger.Logger) ([]byte, error) {
 	return Execute(logger, "squeue", []string{"-h", "-o", "%P,%T,%C,%i,%j,%r,%u"})
@@ -76,7 +75,7 @@ func JobData(logger *logger.Logger) ([]byte, error) {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 func NewJobCollector(logger *logger.Logger) *JobCollector {
-	labels := []string{"job", "status", "partition"}
+	labels := []string{"job", "name", "status", "reason", "partition", "user"}
 	return &JobCollector{
 		jobCPUs:   prometheus.NewDesc("slurm_job_cpus", "CPUs allocated for job", labels, nil),
 		jobID:     prometheus.NewDesc("slurm_job_id", "Job ID with partition", labels, nil),
@@ -115,8 +114,8 @@ func (jc *JobCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	for job, metrics := range jobs {
 		for _, partition := range metrics.partitions {
-			ch <- prometheus.MustNewConstMetric(jc.jobCPUs, prometheus.GaugeValue, float64(metrics.jobCPUs), job, metrics.jobName, metrics.jobStatus, metrics.jobReason, partition)
-			ch <- prometheus.MustNewConstMetric(jc.jobStatus, prometheus.GaugeValue, 1, job, metrics.jobName, metrics.jobStatus, metrics.jobReason, partition)
+			ch <- prometheus.MustNewConstMetric(jc.jobCPUs, prometheus.GaugeValue, float64(metrics.jobCPUs), job, metrics.jobName, metrics.jobStatus, metrics.jobReason, partition, metrics.user)
+			ch <- prometheus.MustNewConstMetric(jc.jobStatus, prometheus.GaugeValue, 1, job, metrics.jobName, metrics.jobStatus, metrics.jobReason, partition, metrics.user)
 		}
 	}
 }
