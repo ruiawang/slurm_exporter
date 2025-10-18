@@ -76,7 +76,7 @@ func JobData(logger *logger.Logger) ([]byte, error) {
  * https://godoc.org/github.com/prometheus/client_golang/prometheus#Collector
  */
 func NewJobCollector(logger *logger.Logger) *JobCollector {
-	labels := []string{"job", "status", "partition"}
+	labels := []string{"job", "name", "status", "reason", "partition"}
 	return &JobCollector{
 		jobCPUs:   prometheus.NewDesc("slurm_job_cpus", "CPUs allocated for job", labels, nil),
 		jobID:     prometheus.NewDesc("slurm_job_id", "Job ID with partition", labels, nil),
@@ -115,8 +115,8 @@ func (jc *JobCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	for job, metrics := range jobs {
 		for _, partition := range metrics.partitions {
-			ch <- prometheus.MustNewConstMetric(jc.jobCPUs, prometheus.GaugeValue, float64(metrics.jobCPUs), job, metrics.jobStatus, partition)
-			ch <- prometheus.MustNewConstMetric(jc.jobStatus, prometheus.GaugeValue, 1, job, metrics.jobStatus, partition)
+			ch <- prometheus.MustNewConstMetric(jc.jobCPUs, prometheus.GaugeValue, float64(metrics.jobCPUs), job, metrics.jobName, metrics.jobStatus, metrics.jobReason, partition)
+			ch <- prometheus.MustNewConstMetric(jc.jobStatus, prometheus.GaugeValue, 1, job, metrics.jobName, metrics.jobStatus, metrics.jobReason, partition)
 		}
 	}
 }
