@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sckyzo/slurm_exporter/internal/logger"
+	"github.com/ruiawang/slurm_exporter/logger"
 )
 
 func TestGPUsMetrics(t *testing.T) {

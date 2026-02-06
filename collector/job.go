@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sckyzo/slurm_exporter/internal/logger"
+	"github.com/ruiawang/slurm_exporter/logger"
 )
 
 // JobMetrics stores metrics for each job

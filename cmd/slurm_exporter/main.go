@@ -27,8 +27,8 @@ import (
 	"github.com/prometheus/exporter-toolkit/web"
 	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
 
-	"github.com/sckyzo/slurm_exporter/internal/collector"
-	"github.com/sckyzo/slurm_exporter/internal/logger"
+	"github.com/ruiawang/slurm_exporter/collector"
+	"github.com/ruiawang/slurm_exporter/logger"
 )
 
 var (

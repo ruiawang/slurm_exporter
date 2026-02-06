@@ -1,6 +1,5 @@
 [Unit]
 Description=Prometheus Slurm Exporter
-Documentation=https://github.com/sckyzo/slurm_exporter
 Wants=network-online.target
 After=network-online.target
 

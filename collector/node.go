@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sckyzo/slurm_exporter/internal/logger"
+	"github.com/ruiawang/slurm_exporter/logger"
 )
 
 // NodeMetrics stores metrics for each node
